@@ -53,67 +53,82 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
         self.jsTools = jsTools
     }
     
-    /**
-     * Generates a non-streaming response and resolves with the final content.
-     */
     @available(iOS 26.0, *)
     func respond(prompt: String, options: NativeGenerationOptions?) throws -> Promise<String> {
-        return Promise.async {
-            guard let modelSession = self.session else {
-                throw AppleAIError.sessionNotInitialized
-            }
-
-            guard !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                return ""
-            }
-
-            let generationOptions = try GenerationOptions(options)
-            try self.ensureModelIsAvailable()
-            try self.beginResponse(using: modelSession)
-            defer { self.endResponse() }
-
-            do {
-                let result = try await modelSession.respond(to: prompt, options: generationOptions)
-                return result.content
-            } catch {
-                throw try await self.failure(from: error, during: .response, in: modelSession)
-            }
+        guard !Self.isBlank(prompt) else { return Promise.resolved(withResult: "") }
+        return generate(during: .response, options: options) { session, generationOptions in
+            try await session.respond(to: prompt, options: generationOptions).content
         }
     }
 
-    /**
-     * Implements the streaming response functionality required by the Nitro interface.
-     * This method bridges the FoundationModels streaming API with the Nitro callback system.
-     */
     @available(iOS 26.0, *)
     func streamResponse(prompt: String, onStream: @escaping (String) -> Void, options: NativeGenerationOptions?) throws -> Promise<String> {
+        guard !Self.isBlank(prompt) else { return Promise.resolved(withResult: "") }
+        return generate(during: .streaming, options: options) { session, generationOptions in
+            try await consumeStreamingResponse(
+                session.streamResponse(to: prompt, options: generationOptions),
+                content: { $0.content },
+                onContent: onStream
+            )
+        }
+    }
+
+    @available(iOS 26.0, *)
+    func respondWithSchema(prompt: String, schema: AnyMap, options: NativeGenerationOptions?) throws -> Promise<String> {
+        let document = schema.schemaDocument()
+        return generate(during: .response, options: options) { session, generationOptions in
+            let generationSchema = try GenerationSchemaBuilder.responseSchema(from: document)
+            return try await session.respond(to: prompt, schema: generationSchema, options: generationOptions)
+                .content.jsonString
+        }
+    }
+
+    @available(iOS 26.0, *)
+    func streamResponseWithSchema(
+        prompt: String,
+        schema: AnyMap,
+        onStream: @escaping (String) -> Void,
+        options: NativeGenerationOptions?
+    ) throws -> Promise<String> {
+        let document = schema.schemaDocument()
+        return generate(during: .streaming, options: options) { session, generationOptions in
+            let generationSchema = try GenerationSchemaBuilder.responseSchema(from: document)
+            return try await consumeStreamingResponse(
+                session.streamResponse(to: prompt, schema: generationSchema, options: generationOptions),
+                content: { $0.content.jsonString },
+                onContent: onStream
+            )
+        }
+    }
+
+    @available(iOS 26.0, *)
+    private func generate(
+        during operation: GenerationOperation,
+        options: NativeGenerationOptions?,
+        _ request: @escaping (LanguageModelSession, GenerationOptions) async throws -> String
+    ) -> Promise<String> {
         return Promise.async {
             guard let modelSession = self.session else {
                 throw AppleAIError.sessionNotInitialized
             }
-            
-            guard !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                return ""
-            }
-            
+
             let generationOptions = try GenerationOptions(options)
             try self.ensureModelIsAvailable()
             try self.beginResponse(using: modelSession)
             defer { self.endResponse() }
-            
+
             do {
-                let stream = modelSession.streamResponse(to: prompt, options: generationOptions)
-                return try await consumeStreamingResponse(
-                    stream,
-                    content: { $0.content },
-                    onContent: onStream
-                )
+                return try await request(modelSession, generationOptions)
             } catch {
-                throw try await self.failure(from: error, during: .streaming, in: modelSession)
+                throw try await self.failure(from: error, during: operation, in: modelSession)
             }
         }
     }
-    
+
+    private static func isBlank(_ prompt: String) -> Bool {
+        prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     @available(iOS 26.0, *)
     var wasContextReset: Bool {
         return contextWasReset

@@ -3,7 +3,7 @@ import FoundationModels
 
 @available(iOS 26.0, macOS 26.0, *)
 private func encodedSchema(_ document: [String: Any]) throws -> [String: Any] {
-    let schema = try ToolSchemaBuilder.schema(fromArguments: document)
+    let schema = try GenerationSchemaBuilder.toolParameters(from: document)
     let data = try JSONEncoder().encode(schema)
     guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
         preconditionFailure("GenerationSchema did not encode to a JSON object")
@@ -11,7 +11,6 @@ private func encodedSchema(_ document: [String: Any]) throws -> [String: Any] {
     return json
 }
 
-/// Resolves `$ref` pointers into `$defs` so assertions can follow named sub-schemas.
 private func resolve(_ node: [String: Any], in root: [String: Any]) -> [String: Any] {
     guard let ref = node["$ref"] as? String,
           let name = ref.components(separatedBy: "/").last,
@@ -32,7 +31,6 @@ private func property(_ name: String, of root: [String: Any]) -> [String: Any] {
     return resolve(node, in: root)
 }
 
-/// Apple encodes string enums as `anyOf` of single-value enums; flatten them back.
 private func enumValues(_ node: [String: Any]) -> [String] {
     if let values = node["enum"] as? [String] {
         return values
@@ -48,7 +46,7 @@ private func expectSchemaCreationFailure(
 ) {
     guard #available(iOS 26.0, macOS 26.0, *) else { return }
     do {
-        _ = try ToolSchemaBuilder.schema(fromArguments: document)
+        _ = try GenerationSchemaBuilder.toolParameters(from: document)
         preconditionFailure("Expected schema creation to fail: \(label)")
     } catch let error as AppleAIError {
         precondition(error.code == "SCHEMA_CREATION_ERROR", "Wrong error for \(label): \(error)")
@@ -65,21 +63,22 @@ private func canonicalJSON(_ value: [String: Any?]) throws -> String {
 }
 
 @main
-struct ToolSchemaBuilderTests {
+struct GenerationSchemaBuilderTests {
     static func main() throws {
         guard #available(iOS 26.0, macOS 26.0, *) else {
-            print("ToolSchemaBuilder tests skipped: FoundationModels unavailable")
+            print("GenerationSchemaBuilder tests skipped: FoundationModels unavailable")
             return
         }
         try schemaContractTests()
         try arrayItemDescriptionTests()
         try emptyObjectSchemaTests()
         try legacyFormatTests()
+        try responseSchemaTests()
         rejectionTests()
         try keywordFixtureTests()
         try valueDecodingTests()
         try valueEncodingTests()
-        print("Swift tool schema builder tests passed")
+        print("Swift generation schema builder tests passed")
     }
 
     @available(iOS 26.0, macOS 26.0, *)
@@ -153,7 +152,6 @@ struct ToolSchemaBuilderTests {
         let lat = property("lat", of: location)
         precondition(lat["type"] as? String == "number")
 
-        // Optional top-level property stays out of `required`.
         let optionalDoc: [String: Any] = [
             "type": "object",
             "properties": [
@@ -190,8 +188,6 @@ struct ToolSchemaBuilderTests {
 
     @available(iOS 26.0, macOS 26.0, *)
     static func emptyObjectSchemaTests() throws {
-        // A JSON Schema document without properties must not fall into the
-        // legacy flat-format path and produce a misleading error.
         let encoded = try encodedSchema(["type": "object"])
         precondition(encoded["type"] as? String == "object")
         let properties = encoded["properties"] as? [String: Any] ?? [:]
@@ -199,10 +195,47 @@ struct ToolSchemaBuilderTests {
     }
 
     @available(iOS 26.0, macOS 26.0, *)
+    static func responseSchemaTests() throws {
+        let document: [String: Any] = [
+            "type": "object",
+            "properties": [
+                "title": ["type": "string"],
+                "difficulty": ["type": "string", "enum": ["easy", "hard"]],
+                "steps": ["type": "array", "items": ["type": "string"]],
+            ],
+            "required": ["title", "difficulty", "steps"],
+        ]
+        let data = try JSONEncoder().encode(GenerationSchemaBuilder.responseSchema(from: document))
+        guard let encoded = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            preconditionFailure("Response schema did not encode to a JSON object")
+        }
+        precondition(encoded["title"] as? String == "Response", "Root name lost: \(encoded)")
+        precondition(Set(enumValues(property("difficulty", of: encoded))) == ["easy", "hard"])
+        precondition(property("steps", of: encoded)["type"] as? String == "array")
+
+        do {
+            _ = try GenerationSchemaBuilder.responseSchema(from: ["title": "string"])
+            preconditionFailure("A flat tool-style map must not be accepted as a response schema")
+        } catch let error as AppleAIError {
+            precondition(error.code == "SCHEMA_CREATION_ERROR", "Wrong error: \(error)")
+        }
+
+        do {
+            _ = try GenerationSchemaBuilder.responseSchema(from: [
+                "type": "object",
+                "properties": ["id": ["anyOf": [["type": "string"], ["type": "number"]]]],
+            ])
+            preconditionFailure("Unsupported keywords must fail for response schemas too")
+        } catch let error as AppleAIError {
+            precondition(error.localizedDescription.contains("response.id"), "Path lost: \(error.localizedDescription)")
+        }
+    }
+
+    @available(iOS 26.0, macOS 26.0, *)
     static func keywordFixtureTests() throws {
         let url = URL(fileURLWithPath: "tests/fixtures/unsupported-schema-keywords.json")
         let fixture = try JSONDecoder().decode([String].self, from: Data(contentsOf: url))
-        let expected = ToolSchemaBuilder.unsupportedKeywords.union(["additionalProperties"])
+        let expected = GenerationSchemaBuilder.unsupportedKeywords.union(["additionalProperties"])
         precondition(Set(fixture) == expected,
                      "Keyword fixture drifted from Swift list: fixture=\(fixture.sorted()) swift=\(expected.sorted())")
     }
@@ -289,7 +322,7 @@ struct ToolSchemaBuilderTests {
             orderedKeys: ["city", "temperature", "sunny", "alerts", "tags", "location"]
         ))
 
-        let decoded = try ToolSchemaBuilder.value(from: content)
+        let decoded = try ToolContent.arguments(from: content)
 
         precondition(decoded["city"] as? String == "NYC")
         precondition(decoded["temperature"] as? Double == 21.5)
@@ -304,9 +337,8 @@ struct ToolSchemaBuilderTests {
         precondition(location["lat"] as? Double == 40.7)
         precondition(location.keys.contains("note") && location["note"]! == nil)
 
-        // Non-structure top-level content is an argument contract violation.
         do {
-            _ = try ToolSchemaBuilder.value(from: GeneratedContent(kind: .string("oops")))
+            _ = try ToolContent.arguments(from: GeneratedContent(kind: .string("oops")))
             preconditionFailure("Expected non-structure content to be rejected")
         } catch let error as AppleAIError {
             precondition(error.code == "ARGUMENT_PARSING_ERROR", "Wrong error: \(error)")
@@ -325,7 +357,7 @@ struct ToolSchemaBuilderTests {
             "station": ["id": "KNYC", "elevation": 10.0] as [String: Any?],
         ]
 
-        let content = try ToolSchemaBuilder.generatedContent(fromResult: result)
+        let content = try ToolContent.generatedContent(fromResult: result)
 
         guard case .structure(let properties, let orderedKeys) = content.kind else {
             preconditionFailure("Result did not encode to a structure")
@@ -347,17 +379,15 @@ struct ToolSchemaBuilderTests {
         precondition(station["id"]?.kind == .string("KNYC"))
         precondition(station["elevation"]?.kind == .number(10.0))
 
-        // Round-trip: decode(encode(x)) == x.
-        let roundTripped = try ToolSchemaBuilder.value(
-            from: try ToolSchemaBuilder.generatedContent(fromResult: result)
+        let roundTripped = try ToolContent.arguments(
+            from: try ToolContent.generatedContent(fromResult: result)
         )
         let roundTrippedJSON = try canonicalJSON(roundTripped)
         let originalJSON = try canonicalJSON(result)
         precondition(roundTrippedJSON == originalJSON, "Round-trip mismatch")
 
-        // Unrepresentable values must throw, never be dropped.
         do {
-            _ = try ToolSchemaBuilder.generatedContent(fromResult: ["when": Date()])
+            _ = try ToolContent.generatedContent(fromResult: ["when": Date()])
             preconditionFailure("Expected unrepresentable result value to be rejected")
         } catch let error as AppleAIError {
             precondition(error.code == "RESPONSE_PARSING_ERROR", "Wrong error: \(error)")

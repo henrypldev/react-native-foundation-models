@@ -17,6 +17,8 @@ namespace margelo::nitro::rnfoundationmodels {
       prototype.registerHybridGetter("wasContextReset", &HybridLanguageModelSessionSpec::getWasContextReset);
       prototype.registerHybridMethod("respond", &HybridLanguageModelSessionSpec::respond);
       prototype.registerHybridMethod("streamResponse", &HybridLanguageModelSessionSpec::streamResponse);
+      prototype.registerHybridMethod("respondWithSchema", &HybridLanguageModelSessionSpec::respondWithSchema);
+      prototype.registerHybridMethod("streamResponseWithSchema", &HybridLanguageModelSessionSpec::streamResponseWithSchema);
       prototype.registerHybridMethod("tokenCount", &HybridLanguageModelSessionSpec::tokenCount);
     });
   }

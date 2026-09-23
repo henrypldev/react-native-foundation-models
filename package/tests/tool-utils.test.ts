@@ -3,7 +3,8 @@ import { join } from 'node:path'
 import { describe, expect, test } from 'bun:test'
 import { z } from 'zod'
 import { ArgumentParsingError, SchemaCreationError } from '../src/errors'
-import { createTool, KEYWORDS, UNSUPPORTED_HINTS } from '../src/tool-utils'
+import { KEYWORDS, UNSUPPORTED_HINTS } from '../src/generation-schema'
+import { createTool } from '../src/tool-utils'
 
 const makeTool = <T extends z.ZodObject<any>>(
   args: T,

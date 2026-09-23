@@ -1,32 +1,30 @@
 import Foundation
 import FoundationModels
 
-/// Converts the JSON Schema documents emitted by `createTool` into
-/// `GenerationSchema`, and converts tool argument/result values between
-/// `GeneratedContent` and plain Swift collections. Pure FoundationModels —
-/// no NitroModules dependency — so it is testable on the host.
 @available(iOS 26.0, macOS 26.0, *)
-enum ToolSchemaBuilder {
-    /// Keywords the TypeScript side already rejects; rejected here too so
-    /// hand-authored `ToolDefinition`s cannot silently degrade. Kept in sync
-    /// with tests/fixtures/unsupported-schema-keywords.json (drift-guarded by
-    /// tests on both sides).
+enum GenerationSchemaBuilder {
     static let unsupportedKeywords: Set<String> = [
         "anyOf", "oneOf", "allOf", "not", "pattern", "format", "prefixItems",
         "propertyNames", "multipleOf", "exclusiveMinimum", "exclusiveMaximum",
         "$ref", "$defs",
     ]
 
-    // MARK: - Schema conversion
-
-    static func schema(fromArguments document: [String: Any]) throws -> GenerationSchema {
-        let root: DynamicGenerationSchema
-        if document["type"] as? String == "object" {
-            root = try dynamicSchema(from: document, name: "ToolParameters", path: "arguments")
-        } else {
-            root = try legacySchema(from: document)
+    static func toolParameters(from document: [String: Any]) throws -> GenerationSchema {
+        guard document["type"] as? String == "object" else {
+            return try GenerationSchema(root: flatTypeNameSchema(from: document), dependencies: [])
         }
-        return try GenerationSchema(root: root, dependencies: [])
+        return try schema(from: document, name: "ToolParameters", path: "arguments")
+    }
+
+    static func responseSchema(from document: [String: Any]) throws -> GenerationSchema {
+        guard document["type"] as? String == "object" else {
+            throw AppleAIError.schemaCreationError("The response schema must have an object at the root")
+        }
+        return try schema(from: document, name: "Response", path: "response")
+    }
+
+    private static func schema(from document: [String: Any], name: String, path: String) throws -> GenerationSchema {
+        try GenerationSchema(root: dynamicSchema(from: document, name: name, path: path), dependencies: [])
     }
 
     /// Dictionaries that crossed the Nitro bridge arrive as `[String: Any?]`;
@@ -107,7 +105,7 @@ enum ToolSchemaBuilder {
             var itemSchema = try dynamicSchema(from: items, name: "\(path)[]", path: "\(path)[]")
             // Primitive schemas have no description slot; a one-choice anyOf
             // wrapper carries the element description into the model contract.
-            if let itemDescription = items["description"] as? String, isPlainPrimitive(items) {
+            if let itemDescription = items["description"] as? String, lacksDescriptionSlot(items) {
                 itemSchema = DynamicGenerationSchema(
                     name: "\(path)[]", description: itemDescription, anyOf: [itemSchema]
                 )
@@ -159,10 +157,7 @@ enum ToolSchemaBuilder {
         }
     }
 
-    /// Backward compatibility for hand-authored `ToolDefinition`s that use the
-    /// flat `{ key: "typename" }` format. Unknown type names now fail instead
-    /// of silently becoming strings.
-    private static func legacySchema(from document: [String: Any]) throws -> DynamicGenerationSchema {
+    private static func flatTypeNameSchema(from document: [String: Any]) throws -> DynamicGenerationSchema {
         let properties = try document.keys.sorted().map { key -> DynamicGenerationSchema.Property in
             guard let typeName = document[key] as? String else {
                 throw AppleAIError.schemaCreationError(
@@ -189,9 +184,7 @@ enum ToolSchemaBuilder {
         return DynamicGenerationSchema(name: "ToolParameters", properties: properties)
     }
 
-    /// True for schema nodes that map to `DynamicGenerationSchema(type:)`,
-    /// which has no description parameter of its own.
-    private static func isPlainPrimitive(_ node: [String: Any]) -> Bool {
+    private static func lacksDescriptionSlot(_ node: [String: Any]) -> Bool {
         switch node["type"] as? String {
         case "number", "integer", "boolean":
             return true
@@ -231,93 +224,6 @@ enum ToolSchemaBuilder {
         case let intValue as Int: return Double(intValue)
         case let int64Value as Int64: return Double(int64Value)
         default: return nil
-        }
-    }
-
-    // MARK: - Value conversion
-
-    /// Decodes model-generated tool arguments into plain Swift values,
-    /// preserving nested structures, arrays, and nulls.
-    static func value(from content: GeneratedContent) throws -> [String: Any?] {
-        guard case .structure(let properties, let orderedKeys) = content.kind else {
-            throw AppleAIError.argumentParsingError(
-                "Expected tool arguments to be an object, got \(content.kind)"
-            )
-        }
-        return structureValues(properties, orderedKeys: orderedKeys)
-    }
-
-    private static func structureValues(
-        _ properties: [String: GeneratedContent], orderedKeys: [String]
-    ) -> [String: Any?] {
-        var object: [String: Any?] = [:]
-        for key in orderedKeys {
-            guard let property = properties[key] else { continue }
-            object[key] = anyValue(from: property)
-        }
-        return object
-    }
-
-    private static func anyValue(from content: GeneratedContent) -> Any? {
-        switch content.kind {
-        case .null:
-            return nil
-        case .bool(let boolValue):
-            return boolValue
-        case .number(let doubleValue):
-            return doubleValue
-        case .string(let stringValue):
-            return stringValue
-        case .array(let elements):
-            return elements.map { anyValue(from: $0) }
-        case .structure(let properties, let orderedKeys):
-            return structureValues(properties, orderedKeys: orderedKeys)
-        @unknown default:
-            return nil
-        }
-    }
-
-    /// Encodes a structured tool result. Every field is preserved;
-    /// unrepresentable values fail loudly instead of being dropped.
-    static func generatedContent(fromResult result: [String: Any?]) throws -> GeneratedContent {
-        return GeneratedContent(kind: try kind(fromValue: result, path: ""))
-    }
-
-    private static func kind(fromValue value: Any?, path: String) throws -> GeneratedContent.Kind {
-        switch value {
-        case nil, is NSNull:
-            return .null
-        case let boolValue as Bool:
-            return .bool(boolValue)
-        case let intValue as Int:
-            return .number(Double(intValue))
-        case let int64Value as Int64:
-            return .number(Double(int64Value))
-        case let doubleValue as Double:
-            return .number(doubleValue)
-        case let floatValue as Float:
-            return .number(Double(floatValue))
-        case let stringValue as String:
-            return .string(stringValue)
-        case let dictionary as [String: Any?]:
-            let orderedKeys = Array(dictionary.keys)
-            var properties: [String: GeneratedContent] = [:]
-            for key in orderedKeys {
-                let childPath = path.isEmpty ? key : "\(path).\(key)"
-                properties[key] = try GeneratedContent(
-                    kind: kind(fromValue: dictionary[key] ?? nil, path: childPath)
-                )
-            }
-            return .structure(properties: properties, orderedKeys: orderedKeys)
-        case let array as [Any?]:
-            let elements = try array.enumerated().map { index, element in
-                try GeneratedContent(kind: kind(fromValue: element, path: "\(path)[\(index)]"))
-            }
-            return .array(elements)
-        default:
-            throw AppleAIError.responseParsingError(
-                "Tool result field '\(path)' has unsupported value of type \(type(of: value ?? "nil"))"
-            )
         }
     }
 }

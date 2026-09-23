@@ -28,11 +28,16 @@ Generates a complete response from the language model.
 
 ```typescript
 respond(prompt: string, options?: GenerationOptions): Promise<string>
+respond<S extends ObjectSchema>(
+  prompt: string,
+  options: StructuredGenerationOptions<S>,
+): Promise<z.infer<S>>
 ```
 
 **Parameters**:
 - `prompt: string` - The user's message
 - `options?: GenerationOptions` - Sampling, temperature, and length limits for this request. See [`GenerationOptions`](#generationoptions)
+- `options.schema?: ObjectSchema` - A Zod object schema. When set, the response is constrained to the schema and the promise resolves with the parsed value. See [Structured output](#structured-output)
 
 ```typescript
 const answer = await session.respond('Name a color', {
@@ -51,12 +56,39 @@ streamResponse(
   onChunk: (responseSoFar: string) => void,
   options?: GenerationOptions,
 ): Promise<string>
+streamResponse<S extends ObjectSchema>(
+  prompt: string,
+  onChunk: (partial: DeepPartial<z.input<S>>) => void,
+  options: StructuredGenerationOptions<S>,
+): Promise<z.infer<S>>
 ```
 
 **Parameters**:
 - `prompt: string` - The user's message
-- `onChunk: (responseSoFar: string) => void` - Called with the full streamed response so far
+- `onChunk` - Called with the full streamed response so far. With `options.schema`, called with the partial object generated so far
 - `options?: GenerationOptions` - Sampling, temperature, and length limits for this request. See [`GenerationOptions`](#generationoptions)
+- `options.schema?: ObjectSchema` - A Zod object schema. See [Structured output](#structured-output)
+
+#### Structured output
+
+```typescript
+const Contact = z.object({
+  name: z.string(),
+  role: z.enum(['engineer', 'designer', 'manager']),
+  address: z.object({ city: z.string(), country: z.string() }),
+  skills: z.array(z.string()).max(4),
+});
+
+const contact = await session.respond(text, { schema: Contact });
+
+const final = await session.streamResponse(text, setDraft, { schema: Contact });
+```
+
+- The schema must have `z.object` at the root. It follows the same rules as tool arguments. See [`createTool`](#createtooldefinition). An unsupported schema rejects with `SCHEMA_CREATION_ERROR` before the request reaches the model. Error paths start with `response`, for example `response.address.city`.
+- The final value is parsed with the schema, so defaults and transforms apply. If it does not parse, the request rejects with `RESPONSE_VALIDATION_ERROR`. `details.issues` holds the Zod issues and `details.response` holds the raw value. This can happen with checks the model cannot see, such as `.refine()`.
+- Each streamed snapshot is the complete object generated so far, as valid JSON. Snapshots are not validated. Fields appear in the order the model writes them, which is not always the schema order. A string can be incomplete. An enum value can be `''` before the model picks one. An array can hold an empty placeholder element (`{}` or `''`) before the model fills it in. Consecutive snapshots can be equal.
+- Context overflow and the other generation errors have the same codes as for text responses.
+- `useLanguageModel` and `useStreamingResponse` return text only.
 
 #### `tokenCount(prompt)`
 
@@ -207,6 +239,30 @@ type ToolCallingMode = 'allowed' | 'required' | 'disallowed';
 - `samplingMode` - How the model picks each token. `greedy` always picks the most likely token. `randomTopK` samples from the `top` most likely tokens (`top` is an integer of 1 or more). `randomProbabilityThreshold` samples from the smallest set of tokens whose probabilities add up to `probabilityThreshold` (greater than 0, at most 1). `seed` is an optional non-negative integer that makes random sampling repeatable.
 - `toolCallingMode` - Whether the model may (`allowed`), must (`required`), or must not (`disallowed`) call tools. iOS 27 and later only. iOS 26 ignores it. With `required`, the model calls a tool at every step. On the iOS 27.0 simulator it kept calling the tool and the request did not end normally, so prefer `allowed` unless your tool loop has an exit.
 
+### `StructuredGenerationOptions`
+
+```typescript
+type ObjectSchema = z.ZodObject<any>;
+
+interface StructuredGenerationOptions<S extends ObjectSchema> extends GenerationOptions {
+  schema: S;
+}
+```
+
+### `DeepPartial`
+
+The type of a streamed partial object. Every field is optional, and every string type (including enums and literals) widens to `string`, because a partial value can be incomplete.
+
+```typescript
+type DeepPartial<T> = T extends string
+  ? string
+  : T extends readonly (infer Element)[]
+    ? DeepPartial<Element>[]
+    : T extends object
+      ? { [Key in keyof T]?: DeepPartial<T[Key]> }
+      : T;
+```
+
 ### `LanguageModelSessionConfig`
 
 ```typescript
@@ -247,9 +303,10 @@ class AppleAIError extends Error {
 - `SESSION_NOT_INITIALIZED` - Session is not ready
 - `TOOL_CALL_ERROR` - Tool call failed
 - `TOOL_EXECUTION_ERROR` - Tool execution failed
-- `SCHEMA_CREATION_ERROR` - Failed to create tool schema
+- `SCHEMA_CREATION_ERROR` - A tool or response schema uses a feature the model does not support
 - `ARGUMENT_PARSING_ERROR` - Failed to parse tool arguments
 - `RESPONSE_PARSING_ERROR` - Failed to parse tool response
+- `RESPONSE_VALIDATION_ERROR` - A structured response does not match its schema. `details.issues` holds the Zod issues
 - `UNKNOWN_TOOL_ERROR` - Unknown tool referenced
 - `SESSION_STREAMING_ERROR` - Streaming failed
 - `SESSION_RESPONSE_ERROR` - Response failed for a reason with no specific code
@@ -292,7 +349,7 @@ The generation fields apply to that stream. The callbacks are not sent to the mo
 Helper function to create type-safe tools with Zod schema validation.
 
 ```typescript
-function createTool<T extends ZodObjectSchema>(definition: {
+function createTool<T extends ObjectSchema>(definition: {
   name: string;
   description: string;
   arguments: T;
@@ -300,7 +357,7 @@ function createTool<T extends ZodObjectSchema>(definition: {
 }): ToolDefinition
 ```
 
-The Zod schema you pass is the exact contract the model sees. Supported schema features:
+The Zod schema you pass is the exact contract the model sees. The same rules apply to the `schema` of a structured response. Supported schema features:
 
 - `z.string()`, `z.number()`, `z.number().int()`, `z.boolean()`
 - `z.object()` and `z.array()`, nested to any depth
