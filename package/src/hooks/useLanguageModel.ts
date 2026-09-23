@@ -7,7 +7,7 @@ import {
 } from '../LanguageModelSession'
 import type { GenerationOptions } from '../types'
 
-export interface UseLanguageModelConfig extends LanguageModelSessionOptions {
+export type UseLanguageModelConfig = LanguageModelSessionOptions & {
   onResponse?: (response: string) => void
   onError?: (error: AppleAIError) => void
 }
@@ -80,24 +80,23 @@ export function useLanguageModel(
     onResponseRef.current = config?.onResponse
   })
 
-  // Create session config object, memoized to prevent unnecessary recreations
-  const sessionConfig = useMemo((): LanguageModelSessionOptions | undefined => {
-    if (
-      !config?.instructions &&
-      !config?.tools &&
-      !config?.useCase &&
-      !config?.guardrails
-    ) {
-      return undefined
-    }
-
-    return {
-      instructions: config.instructions,
-      tools: config.tools,
-      useCase: config.useCase,
-      guardrails: config.guardrails,
-    }
-  }, [config?.instructions, config?.tools, config?.useCase, config?.guardrails])
+  const sessionConfig = useMemo(
+    () =>
+      ({
+        instructions: config?.instructions,
+        transcript: config?.transcript,
+        tools: config?.tools,
+        useCase: config?.useCase,
+        guardrails: config?.guardrails,
+      }) as LanguageModelSessionOptions,
+    [
+      config?.instructions,
+      config?.transcript,
+      config?.tools,
+      config?.useCase,
+      config?.guardrails,
+    ],
+  )
 
   // Initialize session when config changes
   useEffect(() => {

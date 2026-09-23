@@ -98,6 +98,25 @@ The schema must have `z.object` at the root and follows the same rules as tool a
 
 The hooks return text only. Call `session.respond` or `session.streamResponse` directly for structured output.
 
+### Saving and restoring a conversation
+
+`session.transcript` holds the conversation so far, including the instructions. Store it, then pass it to a new session to continue the conversation later.
+
+```typescript
+import { LanguageModelSession, type SerializedTranscript } from 'react-native-foundation-models';
+
+await storage.set('chat', session.transcript);
+
+const saved = (await storage.get('chat')) as SerializedTranscript;
+const restored = new LanguageModelSession({ transcript: saved, tools: [weatherTool] });
+```
+
+A restored session keeps the instructions from its transcript, so `instructions` and `transcript` cannot be used together. TypeScript rejects the combination, and at runtime it throws `INVALID_SESSION_OPTIONS`. Tools are not stored in the transcript. Pass them again. A transcript that cannot be read throws `INVALID_TRANSCRIPT`.
+
+The transcript JSON format belongs to Apple and carries a version (`"version":"1.1"` on iOS 27). The decoder rejects versions, entry roles, and segment types it does not know. A transcript that holds iOS 27-only content, such as reasoning entries or attachment segments, is therefore not expected to restore on iOS 26 and fails with `INVALID_TRANSCRIPT`. Restoring on iOS 26 was not tested. Treat `INVALID_TRANSCRIPT` as a normal outcome after an OS update, and start a new session when it occurs.
+
+Call `session.prewarm(promptPrefix?)` when a request is likely soon, for example when a chat screen opens. The system then loads the model resources before the first request.
+
 ### Using React Hooks
 
 ```typescript
@@ -159,6 +178,7 @@ Core class for managing AI conversations.
 ```typescript
 constructor(config?: {
   instructions?: string;
+  transcript?: SerializedTranscript;
   tools?: Tool[];
   useCase?: 'general' | 'contentTagging';
   guardrails?: 'default' | 'permissiveContentTransformations';
@@ -170,6 +190,8 @@ The library now creates sessions with an explicit `SystemLanguageModel`, which l
 Methods:
 - `respond(prompt, options?)` - Generate a complete response and resolve when finished. With `options.schema`, resolve with the parsed object
 - `streamResponse(prompt, onChunk, options?)` - Stream the response progressively. With `options.schema`, `onChunk` receives partial objects
+- `prewarm(promptPrefix?)` - Load the model resources before the first request
+- `transcript` - The conversation so far as a `SerializedTranscript`, to restore with `new LanguageModelSession({ transcript })`
 
 ### `useLanguageModel(config)`
 
