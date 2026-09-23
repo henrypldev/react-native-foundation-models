@@ -75,13 +75,7 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
                 let result = try await modelSession.respond(to: prompt)
                 return result.content
             } catch {
-                switch mapFoundationModelsError(error, during: .response) {
-                case .contextOverflow:
-                    try await self.recoverFromContextOverflow(previousSession: modelSession)
-                    throw AppleAIError.contextExceeded
-                case .other(let mapped):
-                    throw mapped
-                }
+                throw try await self.failure(from: error, during: .response, in: modelSession)
             }
         }
     }
@@ -113,13 +107,7 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
                     onContent: onStream
                 )
             } catch {
-                switch mapFoundationModelsError(error, during: .streaming) {
-                case .contextOverflow:
-                    try await self.recoverFromContextOverflow(previousSession: modelSession)
-                    throw AppleAIError.contextExceeded
-                case .other(let mapped):
-                    throw mapped
-                }
+                throw try await self.failure(from: error, during: .streaming, in: modelSession)
             }
         }
     }
@@ -175,6 +163,19 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
         } catch {
             throw AppleAIError.contextRecoveryFailed(error)
         }
+    }
+
+    @available(iOS 26.0, *)
+    private func failure(
+        from error: any Error,
+        during operation: GenerationOperation,
+        in previousSession: LanguageModelSession
+    ) async throws -> AppleAIError {
+        let failure = AppleAIError(generationFailure: error, during: operation)
+        if case .contextExceeded = failure {
+            try await recoverFromContextOverflow(previousSession: previousSession)
+        }
+        return failure
     }
 
     @available(iOS 26.0, *)

@@ -20,7 +20,7 @@ swiftc -parse-as-library -module-cache-path "$CACHE" \
 
 swiftc -parse-as-library -module-cache-path "$CACHE" \
   ios/AppleAIErrors.swift \
-  ios/FoundationModelsErrorMapping.swift \
-  tests/FoundationModelsErrorMappingTests.swift \
-  -o /tmp/rn-foundation-models-error-mapping-tests
-/tmp/rn-foundation-models-error-mapping-tests
+  ios/GenerationFailure.swift \
+  tests/GenerationFailureTests.swift \
+  -o /tmp/rn-foundation-models-generation-failure-tests
+/tmp/rn-foundation-models-generation-failure-tests
