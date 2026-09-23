@@ -6,7 +6,7 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
     private var session: LanguageModelSession? = nil
     private var isResponding: Bool = false
     private var tools: [any Tool] = []
-    private var jsTools: [ToolDefinition] = []
+    private let baseInstructions: String
     private var contextWasReset: Bool = false
     private let model: SystemLanguageModel
     private let stateLock = NSLock()
@@ -37,20 +37,24 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
             }
         }
         
-        let enhancedInstructions = Self.buildEnhancedInstructions(
-            baseInstructions: config.instructions, 
-            tools: jsTools
-        )
-        
-        let session = LanguageModelSession(
-            model: model,
-            tools: tools,
-            instructions: enhancedInstructions
-        )
+        let session: LanguageModelSession
+        let baseInstructions: String
+        if let transcript = config.transcript {
+            guard config.instructions == nil else {
+                throw AppleAIError.invalidTranscript("a transcript cannot be combined with instructions")
+            }
+            let decoded = try TranscriptCoding.decode(transcript)
+            session = LanguageModelSession(model: model, tools: tools, transcript: decoded)
+            baseInstructions = TranscriptCoding.instructionsText(in: decoded)
+                ?? Self.buildEnhancedInstructions(baseInstructions: nil, tools: jsTools)
+        } else {
+            baseInstructions = Self.buildEnhancedInstructions(baseInstructions: config.instructions, tools: jsTools)
+            session = LanguageModelSession(model: model, tools: tools, instructions: baseInstructions)
+        }
         self.model = model
         self.session = session
         self.tools = tools
-        self.jsTools = jsTools
+        self.baseInstructions = baseInstructions
     }
     
     @available(iOS 26.0, *)
@@ -128,6 +132,22 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
         return contextWasReset
     }
 
+    @available(iOS 26.0, *)
+    func serializeTranscript() throws -> String {
+        guard let session = self.session else {
+            throw AppleAIError.sessionNotInitialized
+        }
+        return try TranscriptCoding.encode(session.transcript)
+    }
+
+    @available(iOS 26.0, *)
+    func prewarm(promptPrefix: String?) throws {
+        guard let session = self.session else {
+            throw AppleAIError.sessionNotInitialized
+        }
+        session.prewarm(promptPrefix: promptPrefix.map { Prompt($0) })
+    }
+
     /**
      * Returns the number of tokens the provided prompt consumes for this session's model.
      *
@@ -153,15 +173,10 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
     private func createNewSessionWithSummary(previousSession: LanguageModelSession) async throws -> LanguageModelSession {
         let summarySession = LanguageModelSession(model: self.model, transcript: previousSession.transcript)
         let summaryResponse = try await summarySession.respond(to: "Summarize this conversation in a concise way that preserves the key context and information.")
-        let enhancedInstructions = Self.buildEnhancedInstructions(
-            baseInstructions: "You are a helpful assistant. Previous conversation summary: \(summaryResponse.content)",
-            tools: self.jsTools
-        )
-        
         return LanguageModelSession(
             model: self.model,
             tools: self.tools,
-            instructions: enhancedInstructions
+            instructions: "\(baseInstructions)\n\nPrevious conversation summary: \(summaryResponse.content)"
         )
     }
 
@@ -239,16 +254,3 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
     }
 }
 
-/**
- * Custom configuration that uses HybridTool instead of HybridToolSpec
- */
-@available(iOS 26.0, *)
-struct CustomLanguageModelSessionConfig {
-    let instructions: String?
-    let tools: [HybridTool]?
-    
-    init(instructions: String? = nil, tools: [HybridTool]? = nil) {
-        self.instructions = instructions
-        self.tools = tools
-    }
-}

@@ -21,6 +21,7 @@ import type {
   FoundationModelsAvailability,
   FoundationModelsModelFamily,
   GenerationOptions,
+  SerializedTranscript,
   SystemLanguageModelGuardrails,
   SystemLanguageModelUseCase,
 } from './types'
@@ -60,11 +61,19 @@ function responseRequest(
   }
 }
 
-export interface LanguageModelSessionOptions
-  extends Omit<LanguageModelSessionConfig, 'useCase' | 'guardrails'> {
+/**
+ * Options for a new session. A session starts either from `instructions` or
+ * from a `transcript` saved from an earlier session, not both. A restored
+ * session keeps the instructions stored in its transcript.
+ */
+export type LanguageModelSessionOptions = {
+  tools?: LanguageModelSessionConfig['tools']
   useCase?: SystemLanguageModelUseCase
   guardrails?: SystemLanguageModelGuardrails
-}
+} & (
+  | { instructions?: string; transcript?: never }
+  | { transcript: SerializedTranscript; instructions?: never }
+)
 
 /**
  * Gets a human-readable message for the availability status
@@ -211,9 +220,18 @@ export class LanguageModelSession {
       )
     }
 
+    if (config?.instructions !== undefined && config.transcript !== undefined) {
+      throw new AppleAIError(
+        'INVALID_SESSION_OPTIONS',
+        'A session cannot start from both instructions and a transcript',
+        { operation: 'createSession' },
+      )
+    }
+
     try {
       this.session = LanguageModelSessionFactory.create({
         instructions: config?.instructions,
+        transcript: config?.transcript,
         tools: config?.tools,
         useCase: config?.useCase,
         guardrails: config?.guardrails,
@@ -382,5 +400,52 @@ export class LanguageModelSession {
 
   get wasContextReset(): boolean {
     return this.session.wasContextReset
+  }
+
+  /**
+   * The session's conversation so far, including its instructions. Pass it to
+   * `new LanguageModelSession({ transcript })` to continue the conversation in
+   * a new session, for example after the app restarts.
+   *
+   * After a context overflow the session is replaced by a summarized one, and
+   * this reads the replacement's transcript.
+   *
+   * @example
+   * ```typescript
+   * await storage.set('chat', session.transcript)
+   *
+   * const saved = (await storage.get('chat')) as SerializedTranscript
+   * const restored = new LanguageModelSession({ transcript: saved, tools })
+   * ```
+   */
+  get transcript(): SerializedTranscript {
+    try {
+      return this.session.serializeTranscript() as SerializedTranscript
+    } catch (error) {
+      throw parseNativeError(error, {
+        fallbackCode: 'TRANSCRIPT_ENCODING_ERROR',
+        operation: 'transcript',
+      })
+    }
+  }
+
+  /**
+   * Asks the system to load the model resources for this session before the
+   * first request, so the first response can start sooner. Call it when a
+   * request is likely soon, such as when a chat screen opens. `promptPrefix`
+   * is the expected start of the next prompt, when known.
+   *
+   * @example
+   * ```typescript
+   * const session = new LanguageModelSession({ instructions })
+   * session.prewarm()
+   * ```
+   */
+  prewarm(promptPrefix?: string): void {
+    try {
+      this.session.prewarm(promptPrefix)
+    } catch (error) {
+      throw parseNativeError(error, { operation: 'prewarm' })
+    }
   }
 }

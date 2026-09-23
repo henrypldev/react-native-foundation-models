@@ -1,10 +1,11 @@
 import { useCallback, useState } from 'react'
-import { StyleSheet, Switch } from 'react-native'
+import { StyleSheet, Switch, TouchableOpacity } from 'react-native'
 import {
   createTool,
   type GenerationOptions,
   getFoundationModelsContextSize,
   LanguageModelSession,
+  type SerializedTranscript,
 } from 'react-native-foundation-models'
 import { z } from 'zod'
 import { Text, useThemeColor, View } from '@/components/Themed'
@@ -44,13 +45,17 @@ const weatherTool = createTool({
     }
   },
 })
-const session = new LanguageModelSession({
+const initialSession = new LanguageModelSession({
   instructions: 'You are a helpful assistant',
   tools: [weatherTool],
 })
+initialSession.prewarm()
 const contextSize = getFoundationModelsContextSize()
 
 export default function IndexScreen() {
+  const [session, setSession] = useState(initialSession)
+  const [savedTranscript, setSavedTranscript] = useState<SerializedTranscript>()
+  const [transcriptStatus, setTranscriptStatus] = useState('No transcript saved')
   const [result, setResult] = useState('')
   const [loading, setLoading] = useState(false)
   const [tokenMetrics, setTokenMetrics] = useState<TokenMetrics>()
@@ -60,6 +65,7 @@ export default function IndexScreen() {
   const mutedColor = useThemeColor({}, 'muted')
   const borderColor = useThemeColor({}, 'border')
   const cardColor = useThemeColor({}, 'card')
+  const tintColor = useThemeColor({}, 'tint')
 
   const handleSubmit = useCallback(
     async (prompt: string) => {
@@ -87,8 +93,35 @@ export default function IndexScreen() {
         setLoading(false)
       }
     },
-    [greedy, capTokens],
+    [session, greedy, capTokens],
   )
+
+  const saveTranscript = () => {
+    try {
+      const transcript = session.transcript
+      setSavedTranscript(transcript)
+      setTranscriptStatus(`Transcript saved (${transcript.length} chars)`)
+    } catch (error) {
+      setTranscriptStatus(`Save failed: ${(error as Error).message}`)
+    }
+  }
+
+  const restoreTranscript = () => {
+    if (!savedTranscript) {
+      return
+    }
+    try {
+      const restored = new LanguageModelSession({
+        transcript: savedTranscript,
+        tools: [weatherTool],
+      })
+      restored.prewarm()
+      setSession(restored)
+      setTranscriptStatus('Restored into a new session')
+    } catch (error) {
+      setTranscriptStatus(`Restore failed: ${(error as Error).message}`)
+    }
+  }
 
   return (
     <WeatherDemo
@@ -124,6 +157,35 @@ export default function IndexScreen() {
           />
         </View>
       </View>
+      <View style={[styles.card, { borderColor, backgroundColor: cardColor }]}>
+        <Text style={[styles.cardLabel, { color: mutedColor }]}>TRANSCRIPT</Text>
+        <View style={styles.buttons}>
+          <TouchableOpacity
+            testID="save-transcript"
+            accessibilityRole="button"
+            disabled={loading}
+            onPress={saveTranscript}
+            style={[styles.chip, { borderColor: tintColor, opacity: loading ? 0.4 : 1 }]}
+          >
+            <Text style={{ color: tintColor }}>Save transcript</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            testID="restore-transcript"
+            accessibilityRole="button"
+            disabled={loading || !savedTranscript}
+            onPress={restoreTranscript}
+            style={[
+              styles.chip,
+              { borderColor: tintColor, opacity: loading || !savedTranscript ? 0.4 : 1 },
+            ]}
+          >
+            <Text style={{ color: tintColor }}>Restore</Text>
+          </TouchableOpacity>
+        </View>
+        <Text testID="transcript-status" style={{ color: mutedColor }}>
+          {transcriptStatus}
+        </Text>
+      </View>
     </WeatherDemo>
   )
 }
@@ -149,5 +211,17 @@ const styles = StyleSheet.create({
   },
   rowLabel: {
     fontSize: 15,
+  },
+  buttons: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingVertical: 6,
+    backgroundColor: 'transparent',
+  },
+  chip: {
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
 })

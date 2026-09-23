@@ -11,11 +11,12 @@ sidebar_position: 3
 Creates a new LanguageModelSession instance. Throws an error if Apple Intelligence is not available.
 
 ```typescript
-constructor(config?: LanguageModelSessionConfig)
+constructor(config?: LanguageModelSessionOptions)
 ```
 
 **Parameters**:
 - `config.instructions?: string` - System instructions defining AI behavior
+- `config.transcript?: SerializedTranscript` - A transcript saved from an earlier session with `session.transcript`. The new session continues that conversation and keeps its instructions. Cannot be combined with `instructions`: TypeScript rejects it, and at runtime it throws `INVALID_SESSION_OPTIONS`. A transcript that cannot be read throws `INVALID_TRANSCRIPT`
 - `config.tools?: ToolDefinition[]` - Array of tools the AI can invoke
 - `config.useCase?: 'general' | 'contentTagging'` - Configures the system model use case
 - `config.guardrails?: 'default' | 'permissiveContentTransformations'` - Configures Foundation Models guardrails
@@ -103,6 +104,17 @@ tokenCount(prompt: string): Promise<number>
 
 **Availability**: iOS 26.4 or later. On earlier versions the returned promise rejects with an `UNSUPPORTED_PLATFORM` error.
 
+#### `prewarm(promptPrefix?)`
+
+Asks the system to load the model resources for this session before the first request, so the first response can start sooner. Call it when a request is likely soon, such as when a chat screen opens.
+
+```typescript
+prewarm(promptPrefix?: string): void
+```
+
+**Parameters**:
+- `promptPrefix?: string` - The expected start of the next prompt, when known
+
 ### Instance Properties
 
 #### `wasContextReset`
@@ -112,6 +124,23 @@ Boolean flag indicating whether the session's context was automatically summariz
 ```typescript
 readonly wasContextReset: boolean
 ```
+
+#### `transcript`
+
+The conversation so far, including the instructions. Each read returns the current state. After a context overflow the session is replaced by a summarized one, and `transcript` reads the replacement.
+
+```typescript
+readonly transcript: SerializedTranscript
+```
+
+```typescript
+await storage.set('chat', session.transcript);
+
+const saved = (await storage.get('chat')) as SerializedTranscript;
+const restored = new LanguageModelSession({ transcript: saved, tools });
+```
+
+Tools are not stored in the transcript. Pass them again to the new session. A transcript that cannot be encoded throws `TRANSCRIPT_ENCODING_ERROR`.
 
 ## Functions
 
@@ -155,6 +184,7 @@ function useLanguageModel(config?: UseLanguageModelConfig): UseLanguageModelRetu
 
 **Parameters**:
 - `config.instructions?: string` - System instructions for the AI
+- `config.transcript?: SerializedTranscript` - A saved transcript to continue. Cannot be combined with `instructions`
 - `config.tools?: ToolDefinition[]` - Tools the AI can use
 - `config.onResponse?: (response: string) => void` - Callback for responses
 - `config.onError?: (error: AppleAIError) => void` - Callback for errors
@@ -263,16 +293,30 @@ type DeepPartial<T> = T extends string
       : T;
 ```
 
-### `LanguageModelSessionConfig`
+### `LanguageModelSessionOptions`
 
 ```typescript
-interface LanguageModelSessionConfig {
-  instructions?: string;
+type LanguageModelSessionOptions = {
   tools?: ToolDefinition[];
   useCase?: 'general' | 'contentTagging';
   guardrails?: 'default' | 'permissiveContentTransformations';
-}
+} & (
+  | { instructions?: string; transcript?: never }
+  | { transcript: SerializedTranscript; instructions?: never }
+);
 ```
+
+### `SerializedTranscript`
+
+A session transcript in Apple's `Transcript` JSON format, typed as a branded string.
+
+```typescript
+type SerializedTranscript = string & { readonly [brand]: 'SerializedTranscript' };
+```
+
+The format belongs to Apple and carries a version (`"version":"1.1"` on iOS 27). The only promise is that a value read from `session.transcript` restores through `new LanguageModelSession({ transcript })`. Do not build or edit one by hand. A value read back from storage needs a cast: `stored as SerializedTranscript`.
+
+The decoder rejects versions, entry roles, and segment types it does not know. On iOS 27 it rejects every version other than `1.1`. A transcript that holds iOS 27-only content, such as reasoning entries or attachment segments, is therefore not expected to restore on iOS 26. Restoring on iOS 26 was not tested. Treat `INVALID_TRANSCRIPT` as a normal outcome after an OS update, and start a new session when it occurs.
 
 ### `ToolDefinition`
 
@@ -327,6 +371,9 @@ class AppleAIError extends Error {
 - `TIMEOUT` - The request timed out (iOS 27+)
 - `TOKEN_COUNT_ERROR` - Token counting failed
 - `INVALID_GENERATION_OPTIONS` - A `GenerationOptions` value is invalid. `details.field` names the field
+- `INVALID_SESSION_OPTIONS` - The session options combine `instructions` and `transcript`
+- `INVALID_TRANSCRIPT` - The `transcript` option cannot be decoded. It is not valid JSON, not a transcript, or holds a version or content this OS does not know
+- `TRANSCRIPT_ENCODING_ERROR` - `session.transcript` could not encode the conversation
 
 The same failure has the same code on iOS 26 and iOS 27.
 
