@@ -48,6 +48,26 @@ await session.streamResponse('Hello, how are you?', (responseSoFar) => {
 });
 ```
 
+### Generation options
+
+Pass `GenerationOptions` as the last argument to control sampling and length for one request.
+
+```typescript
+const answer = await session.respond('Name a color', {
+  samplingMode: { kind: 'greedy' },
+  maximumResponseTokens: 20,
+});
+
+await session.streamResponse('Write a haiku', onChunk, {
+  temperature: 0.2,
+  samplingMode: { kind: 'randomTopK', top: 40, seed: 1 },
+});
+```
+
+Fields: `temperature`, `maximumResponseTokens`, `samplingMode` (`greedy`, `randomTopK`, or `randomProbabilityThreshold`), and `toolCallingMode` (`allowed`, `required`, or `disallowed`). `toolCallingMode` needs iOS 27 or later. iOS 26 ignores it. With `required`, the model calls a tool at every step and may not end the request. Invalid values reject with an `INVALID_GENERATION_OPTIONS` error.
+
+In a session with tools, a very small `maximumResponseTokens` (for example 5) can reject with `DECODING_FAILURE`, because the model uses tokens to decide on tool calls before it writes the answer.
+
 ### Using React Hooks
 
 ```typescript
@@ -118,8 +138,8 @@ constructor(config?: {
 The library now creates sessions with an explicit `SystemLanguageModel`, which lets you opt into Foundation Models use cases and guardrails from React Native.
 
 Methods:
-- `respond(prompt)` - Generate a complete response and resolve when finished
-- `streamResponse(prompt, onChunk)` - Stream the response progressively
+- `respond(prompt, options?)` - Generate a complete response and resolve when finished
+- `streamResponse(prompt, onChunk, options?)` - Stream the response progressively
 
 ### `useLanguageModel(config)`
 
@@ -130,7 +150,7 @@ Returns:
 - `response` - Latest AI response
 - `loading` - Whether a request is in progress
 - `error` - Any error that occurred
-- `send(prompt)` - Send a message to the AI
+- `send(prompt, options?)` - Send a message to the AI
 - `reset()` - Reset the conversation state
 - `isSessionReady` - Whether the session is ready to use
 

@@ -57,7 +57,7 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
      * Generates a non-streaming response and resolves with the final content.
      */
     @available(iOS 26.0, *)
-    func respond(prompt: String) throws -> Promise<String> {
+    func respond(prompt: String, options: NativeGenerationOptions?) throws -> Promise<String> {
         return Promise.async {
             guard let modelSession = self.session else {
                 throw AppleAIError.sessionNotInitialized
@@ -67,12 +67,13 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
                 return ""
             }
 
+            let generationOptions = try GenerationOptions(options)
             try self.ensureModelIsAvailable()
             try self.beginResponse(using: modelSession)
             defer { self.endResponse() }
 
             do {
-                let result = try await modelSession.respond(to: prompt)
+                let result = try await modelSession.respond(to: prompt, options: generationOptions)
                 return result.content
             } catch {
                 throw try await self.failure(from: error, during: .response, in: modelSession)
@@ -85,7 +86,7 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
      * This method bridges the FoundationModels streaming API with the Nitro callback system.
      */
     @available(iOS 26.0, *)
-    func streamResponse(prompt: String, onStream: @escaping (String) -> Void) throws -> Promise<String> {
+    func streamResponse(prompt: String, onStream: @escaping (String) -> Void, options: NativeGenerationOptions?) throws -> Promise<String> {
         return Promise.async {
             guard let modelSession = self.session else {
                 throw AppleAIError.sessionNotInitialized
@@ -95,12 +96,13 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
                 return ""
             }
             
+            let generationOptions = try GenerationOptions(options)
             try self.ensureModelIsAvailable()
             try self.beginResponse(using: modelSession)
             defer { self.endResponse() }
             
             do {
-                let stream = modelSession.streamResponse(to: prompt)
+                let stream = modelSession.streamResponse(to: prompt, options: generationOptions)
                 return try await consumeStreamingResponse(
                     stream,
                     content: { $0.content },

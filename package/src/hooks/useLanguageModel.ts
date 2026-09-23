@@ -5,6 +5,7 @@ import {
   LanguageModelSession,
   type LanguageModelSessionOptions,
 } from '../LanguageModelSession'
+import type { GenerationOptions } from '../types'
 
 export interface UseLanguageModelConfig extends LanguageModelSessionOptions {
   onResponse?: (response: string) => void
@@ -16,7 +17,7 @@ export interface UseLanguageModelReturn {
   response: string
   loading: boolean
   error: AppleAIError | null
-  send: (prompt: string) => Promise<string>
+  send: (prompt: string, options?: GenerationOptions) => Promise<string>
   reset: () => void
   isSessionReady: boolean
 }
@@ -121,7 +122,7 @@ export function useLanguageModel(
   }, [])
 
   const send = useCallback(
-    async (prompt: string): Promise<string> => {
+    async (prompt: string, options?: GenerationOptions): Promise<string> => {
       if (!session?.session) {
         const error = sessionError || new SessionNotInitializedError()
         setError(error)
@@ -144,7 +145,7 @@ export function useLanguageModel(
         setResponse('')
         isCancelledRef.current = false
 
-        const responsePromise = session.respond(prompt)
+        const responsePromise = session.respond(prompt, options)
         activeStreamRef.current = responsePromise
         const fullResponse = await responsePromise
 
