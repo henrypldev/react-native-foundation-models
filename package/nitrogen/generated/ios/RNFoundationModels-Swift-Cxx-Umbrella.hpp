@@ -16,8 +16,14 @@ namespace margelo::nitro::rnfoundationmodels { class HybridLanguageModelSessionS
 namespace margelo::nitro::rnfoundationmodels { struct LanguageModelSessionConfig; }
 // Forward declaration of `NativeGenerationOptions` to properly resolve imports.
 namespace margelo::nitro::rnfoundationmodels { struct NativeGenerationOptions; }
+// Forward declaration of `NativeModelCapability` to properly resolve imports.
+namespace margelo::nitro::rnfoundationmodels { enum class NativeModelCapability; }
+// Forward declaration of `NativeReasoningLevel` to properly resolve imports.
+namespace margelo::nitro::rnfoundationmodels { enum class NativeReasoningLevel; }
 // Forward declaration of `NativeSamplingMode` to properly resolve imports.
 namespace margelo::nitro::rnfoundationmodels { enum class NativeSamplingMode; }
+// Forward declaration of `NativeTokenUsage` to properly resolve imports.
+namespace margelo::nitro::rnfoundationmodels { struct NativeTokenUsage; }
 // Forward declaration of `NativeToolCallingMode` to properly resolve imports.
 namespace margelo::nitro::rnfoundationmodels { enum class NativeToolCallingMode; }
 // Forward declaration of `ToolDefinition` to properly resolve imports.
@@ -28,7 +34,10 @@ namespace margelo::nitro::rnfoundationmodels { struct ToolDefinition; }
 #include "HybridLanguageModelSessionSpec.hpp"
 #include "LanguageModelSessionConfig.hpp"
 #include "NativeGenerationOptions.hpp"
+#include "NativeModelCapability.hpp"
+#include "NativeReasoningLevel.hpp"
 #include "NativeSamplingMode.hpp"
+#include "NativeTokenUsage.hpp"
 #include "NativeToolCallingMode.hpp"
 #include "ToolDefinition.hpp"
 #include <NitroModules/AnyMap.hpp>

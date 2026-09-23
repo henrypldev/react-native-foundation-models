@@ -31,6 +31,13 @@ export type SystemLanguageModelGuardrails = 'default' | 'permissiveContentTransf
 
 export type FoundationModelsModelFamily = '26.0-26.3' | '26.4+'
 
+/**
+ * A feature the on-device model supports. Read the list from
+ * `checkFoundationModelsAvailability().capabilities` before you use a feature
+ * that not every model has, such as `reasoningLevel`.
+ */
+export type ModelCapability = 'vision' | 'guidedGeneration' | 'reasoning' | 'toolCalling'
+
 export type AvailabilityStatus =
   | 'available'
   | 'unavailable.platformNotSupported'
@@ -44,7 +51,36 @@ export interface FoundationModelsAvailability {
   status: AvailabilityStatus
   message: string
   contextSize?: number
+  /**
+   * @deprecated Guessed from the iOS version, and reports `'26.4+'` for every
+   * iOS 27 model. On iOS 27 and later, read `variant` instead.
+   */
   modelFamily?: FoundationModelsModelFamily
+  /**
+   * The display name of the on-device model, such as `'AFM 3 Core'`.
+   * iOS 27 and later only. `undefined` on iOS 26.
+   */
+  variant?: string
+  /**
+   * The features the on-device model supports. iOS 27 and later only.
+   * `undefined` on iOS 26.
+   */
+  capabilities?: ModelCapability[]
+}
+
+/**
+ * Token counts that Apple reports for requests. iOS 27 and later only.
+ *
+ * `cachedInputTokens` is the part of `inputTokens` that the model read from
+ * its cache. `reasoningTokens` is the part of `outputTokens` the model spent
+ * on reasoning. `totalTokens` is `inputTokens + outputTokens`.
+ */
+export interface TokenUsage {
+  inputTokens: number
+  cachedInputTokens: number
+  outputTokens: number
+  reasoningTokens: number
+  totalTokens: number
 }
 
 /**
@@ -66,6 +102,11 @@ export type SamplingMode =
  * Whether the model may, must, or must not call the session's tools.
  */
 export type ToolCallingMode = 'allowed' | 'required' | 'disallowed'
+
+/**
+ * How much the model reasons before it answers.
+ */
+export type ReasoningLevel = 'light' | 'moderate' | 'deep'
 
 /**
  * Options that control a single `respond` or `streamResponse` request.
@@ -91,6 +132,13 @@ export interface GenerationOptions {
    * step and may not end the request.
    */
   toolCallingMode?: ToolCallingMode
+  /**
+   * How much the model reasons before it answers. iOS 27 and later only.
+   * iOS 26 ignores this value. A model without the `reasoning` capability
+   * rejects the request with `UNSUPPORTED_CAPABILITY`, so check
+   * `checkFoundationModelsAvailability().capabilities` first.
+   */
+  reasoningLevel?: ReasoningLevel
 }
 
 declare const serializedTranscriptBrand: unique symbol

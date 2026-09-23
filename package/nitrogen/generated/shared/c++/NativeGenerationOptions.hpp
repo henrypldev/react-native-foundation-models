@@ -32,10 +32,13 @@
 namespace margelo::nitro::rnfoundationmodels { enum class NativeSamplingMode; }
 // Forward declaration of `NativeToolCallingMode` to properly resolve imports.
 namespace margelo::nitro::rnfoundationmodels { enum class NativeToolCallingMode; }
+// Forward declaration of `NativeReasoningLevel` to properly resolve imports.
+namespace margelo::nitro::rnfoundationmodels { enum class NativeReasoningLevel; }
 
 #include <optional>
 #include "NativeSamplingMode.hpp"
 #include "NativeToolCallingMode.hpp"
+#include "NativeReasoningLevel.hpp"
 
 namespace margelo::nitro::rnfoundationmodels {
 
@@ -51,10 +54,11 @@ namespace margelo::nitro::rnfoundationmodels {
     std::optional<double> samplingProbabilityThreshold     SWIFT_PRIVATE;
     std::optional<double> samplingSeed     SWIFT_PRIVATE;
     std::optional<NativeToolCallingMode> toolCallingMode     SWIFT_PRIVATE;
+    std::optional<NativeReasoningLevel> reasoningLevel     SWIFT_PRIVATE;
 
   public:
     NativeGenerationOptions() = default;
-    explicit NativeGenerationOptions(std::optional<double> temperature, std::optional<double> maximumResponseTokens, std::optional<NativeSamplingMode> samplingMode, std::optional<double> samplingTop, std::optional<double> samplingProbabilityThreshold, std::optional<double> samplingSeed, std::optional<NativeToolCallingMode> toolCallingMode): temperature(temperature), maximumResponseTokens(maximumResponseTokens), samplingMode(samplingMode), samplingTop(samplingTop), samplingProbabilityThreshold(samplingProbabilityThreshold), samplingSeed(samplingSeed), toolCallingMode(toolCallingMode) {}
+    explicit NativeGenerationOptions(std::optional<double> temperature, std::optional<double> maximumResponseTokens, std::optional<NativeSamplingMode> samplingMode, std::optional<double> samplingTop, std::optional<double> samplingProbabilityThreshold, std::optional<double> samplingSeed, std::optional<NativeToolCallingMode> toolCallingMode, std::optional<NativeReasoningLevel> reasoningLevel): temperature(temperature), maximumResponseTokens(maximumResponseTokens), samplingMode(samplingMode), samplingTop(samplingTop), samplingProbabilityThreshold(samplingProbabilityThreshold), samplingSeed(samplingSeed), toolCallingMode(toolCallingMode), reasoningLevel(reasoningLevel) {}
 
   public:
     friend bool operator==(const NativeGenerationOptions& lhs, const NativeGenerationOptions& rhs) = default;
@@ -76,7 +80,8 @@ namespace margelo::nitro {
         JSIConverter<std::optional<double>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "samplingTop"))),
         JSIConverter<std::optional<double>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "samplingProbabilityThreshold"))),
         JSIConverter<std::optional<double>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "samplingSeed"))),
-        JSIConverter<std::optional<margelo::nitro::rnfoundationmodels::NativeToolCallingMode>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "toolCallingMode")))
+        JSIConverter<std::optional<margelo::nitro::rnfoundationmodels::NativeToolCallingMode>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "toolCallingMode"))),
+        JSIConverter<std::optional<margelo::nitro::rnfoundationmodels::NativeReasoningLevel>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "reasoningLevel")))
       );
     }
     static inline jsi::Value toJSI(jsi::Runtime& runtime, const margelo::nitro::rnfoundationmodels::NativeGenerationOptions& arg) {
@@ -88,6 +93,7 @@ namespace margelo::nitro {
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "samplingProbabilityThreshold"), JSIConverter<std::optional<double>>::toJSI(runtime, arg.samplingProbabilityThreshold));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "samplingSeed"), JSIConverter<std::optional<double>>::toJSI(runtime, arg.samplingSeed));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "toolCallingMode"), JSIConverter<std::optional<margelo::nitro::rnfoundationmodels::NativeToolCallingMode>>::toJSI(runtime, arg.toolCallingMode));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "reasoningLevel"), JSIConverter<std::optional<margelo::nitro::rnfoundationmodels::NativeReasoningLevel>>::toJSI(runtime, arg.reasoningLevel));
       return obj;
     }
     static inline bool canConvert(jsi::Runtime& runtime, const jsi::Value& value) {
@@ -105,6 +111,7 @@ namespace margelo::nitro {
       if (!JSIConverter<std::optional<double>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "samplingProbabilityThreshold")))) return false;
       if (!JSIConverter<std::optional<double>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "samplingSeed")))) return false;
       if (!JSIConverter<std::optional<margelo::nitro::rnfoundationmodels::NativeToolCallingMode>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "toolCallingMode")))) return false;
+      if (!JSIConverter<std::optional<margelo::nitro::rnfoundationmodels::NativeReasoningLevel>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "reasoningLevel")))) return false;
       return true;
     }
   };

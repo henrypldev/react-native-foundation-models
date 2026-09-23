@@ -23,6 +23,7 @@ run_suite() {
 }
 
 check_stand_in NativeGenerationOptions
+check_stand_in NativeTokenUsage
 
 run_suite streaming ios/StreamingResponseAccumulator.swift tests/StreamingResponseAccumulatorTests.swift
 run_suite schema ios/GenerationSchemaBuilder.swift ios/ToolContent.swift tests/GenerationSchemaBuilderTests.swift
@@ -30,3 +31,4 @@ run_suite generation-failure ios/GenerationFailure.swift tests/GenerationFailure
 run_suite generation-options ios/GenerationOptionsMapping.swift tests/GenerationOptionsMappingTests.swift
 run_suite transcript ios/TranscriptCoding.swift tests/TranscriptCodingTests.swift
 run_suite session-instructions ios/SessionInstructions.swift tests/SessionInstructionsTests.swift
+run_suite context-options ios/ContextOptionsMapping.swift ios/TokenUsage.swift tests/ContextOptionsAndUsageTests.swift

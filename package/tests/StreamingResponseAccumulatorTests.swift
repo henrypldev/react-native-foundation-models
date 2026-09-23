@@ -14,14 +14,14 @@ struct StreamingResponseAccumulatorTests {
         continuation.finish()
 
         var snapshots: [String] = []
-        let response = try await consumeStreamingResponse(
-            stream,
-            content: { $0 },
-            onContent: { snapshots.append($0) }
-        )
+        let response = try await consumeStreamingResponse(stream) { snapshots.append($0) }
 
         precondition(response == "one two")
         precondition(snapshots == ["one", "one two"])
+
+        let emptyStream = AsyncStream<String> { $0.finish() }
+        let emptyResponse = try await consumeStreamingResponse(emptyStream) { _ in }
+        precondition(emptyResponse == nil)
 
         let failingStream = AsyncThrowingStream<String, Error> { continuation in
             continuation.yield("partial")
@@ -29,11 +29,7 @@ struct StreamingResponseAccumulatorTests {
         }
 
         do {
-            _ = try await consumeStreamingResponse(
-                failingStream,
-                content: { $0 },
-                onContent: { _ in }
-            )
+            _ = try await consumeStreamingResponse(failingStream) { _ in }
             preconditionFailure("Expected the stream failure to propagate")
         } catch TestFailure.expected {
             // Expected.

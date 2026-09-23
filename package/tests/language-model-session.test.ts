@@ -13,16 +13,19 @@ type NativeSession = Omit<LanguageModelSessionSpec, keyof HybridObject<{ ios: 's
 let nativeSession: NativeSession
 let createSession: (config: LanguageModelSessionConfig) => NativeSession
 
-const factory = {
+type Mutable<T> = { -readonly [Key in keyof T]: T[Key] }
+
+type NativeFactory = Mutable<
+  Omit<LanguageModelSessionFactory, keyof HybridObject<{ ios: 'swift' }> | 'create'>
+> & {
+  create: (config: LanguageModelSessionConfig) => NativeSession
+}
+
+const factory: NativeFactory = {
   isAvailable: true,
   availabilityStatus: 'available',
   contextSize: 4096,
   create: (config: LanguageModelSessionConfig) => createSession(config),
-} satisfies Omit<
-  LanguageModelSessionFactory,
-  keyof HybridObject<{ ios: 'swift' }> | 'create'
-> & {
-  create: (config: LanguageModelSessionConfig) => NativeSession
 }
 
 mock.module('react-native-nitro-modules', () => ({
@@ -35,7 +38,9 @@ mock.module('react-native', () => ({
   Platform: { OS: 'ios', Version: '26.4' },
 }))
 
-const { LanguageModelSession } = await import('../src/LanguageModelSession')
+const { LanguageModelSession, checkFoundationModelsAvailability } = await import(
+  '../src/LanguageModelSession'
+)
 
 beforeEach(() => {
   nativeSession = {
@@ -51,6 +56,8 @@ beforeEach(() => {
     wasContextReset: false,
   }
   createSession = () => nativeSession
+  factory.modelVariant = undefined
+  factory.modelCapabilities = undefined
 })
 
 describe('LanguageModelSession native boundary', () => {
@@ -144,6 +151,7 @@ describe('LanguageModelSession native boundary', () => {
     })
     await session.streamResponse('Hello', onChunk, {
       samplingMode: { kind: 'randomTopK', top: 3, seed: 1 },
+      reasoningLevel: 'moderate',
     })
 
     expect(respond).toHaveBeenCalledWith(
@@ -159,6 +167,7 @@ describe('LanguageModelSession native boundary', () => {
         samplingMode: 'randomTopK',
         samplingTop: 3,
         samplingSeed: 1,
+        reasoningLevel: 'moderate',
       }),
     )
   })
@@ -416,5 +425,24 @@ describe('LanguageModelSession transcript', () => {
         details: expect.objectContaining({ operation: 'transcript' }),
       }),
     )
+  })
+})
+
+describe('iOS 27 model info', () => {
+  test('reports the native model variant and capabilities', () => {
+    factory.modelVariant = 'AFM 3 Core'
+    factory.modelCapabilities = ['vision', 'guidedGeneration', 'toolCalling']
+
+    expect(checkFoundationModelsAvailability()).toMatchObject({
+      variant: 'AFM 3 Core',
+      capabilities: ['vision', 'guidedGeneration', 'toolCalling'],
+    })
+  })
+
+  test('leaves model info undefined when native reports none', () => {
+    const availability = checkFoundationModelsAvailability()
+
+    expect(availability.variant).toBeUndefined()
+    expect(availability.capabilities).toBeUndefined()
   })
 })

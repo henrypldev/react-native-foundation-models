@@ -70,6 +70,31 @@ class HybridLanguageModelSessionFactory: HybridLanguageModelSessionFactorySpec {
         return nil
     }
 
+    var modelVariant: String? {
+        #if compiler(>=6.4)
+        if #available(iOS 27.0, *) {
+            return SystemLanguageModel.default.variant.displayName
+        }
+        #endif
+        return nil
+    }
+
+    var modelCapabilities: [NativeModelCapability]? {
+        #if compiler(>=6.4)
+        if #available(iOS 27.0, *) {
+            let capabilities = SystemLanguageModel.default.capabilities
+            let table: [(NativeModelCapability, LanguageModelCapabilities.Capability)] = [
+                (.vision, .vision),
+                (.guidedgeneration, .guidedGeneration),
+                (.reasoning, .reasoning),
+                (.toolcalling, .toolCalling),
+            ]
+            return table.filter { capabilities.contains($0.1) }.map(\.0)
+        }
+        #endif
+        return nil
+    }
+
     @available(iOS 26.0, *)
     private static func makeModel(
         useCase: String?,
