@@ -1,12 +1,20 @@
 import { Platform } from 'react-native'
 import { NitroModules } from 'react-native-nitro-modules'
+import type { z } from 'zod'
 import { AppleAIError, parseNativeError } from './errors'
 import { toNativeGenerationOptions } from './generation-options'
+import { type ObjectSchema, toGenerationSchema } from './generation-schema'
 import type {
   LanguageModelSessionConfig,
   LanguageModelSessionFactory as LanguageModelSessionFactorySpec,
   LanguageModelSession as LanguageModelSessionSpec,
 } from './specs/LanguageModelSession.nitro'
+import {
+  type DeepPartial,
+  parseResponseJson,
+  parseResponse,
+  type StructuredGenerationOptions,
+} from './structured-output'
 import type {
   AvailabilityStatus,
   FoundationModelsAvailability,
@@ -20,6 +28,8 @@ const LanguageModelSessionFactory =
   NitroModules.createHybridObject<LanguageModelSessionFactorySpec>(
     'LanguageModelSessionFactory',
   )
+
+type MaybeStructuredOptions = GenerationOptions & { schema?: ObjectSchema }
 
 export interface LanguageModelSessionOptions
   extends Omit<LanguageModelSessionConfig, 'useCase' | 'guardrails'> {
@@ -190,6 +200,12 @@ export class LanguageModelSession {
   /**
    * Generates a complete response from the language model and resolves when finished.
    *
+   * With a `schema`, the model is constrained to the Zod object schema and the
+   * promise resolves with the parsed value. A value that does not parse rejects
+   * with a `RESPONSE_VALIDATION_ERROR` whose `details.issues` holds the Zod issues.
+   * A schema the model cannot use rejects with a `SCHEMA_CREATION_ERROR` before
+   * the request reaches the model.
+   *
    * Invalid `options` reject with an `INVALID_GENERATION_OPTIONS` error before
    * the request reaches the model.
    *
@@ -199,11 +215,30 @@ export class LanguageModelSession {
    *   samplingMode: { kind: 'greedy' },
    *   maximumResponseTokens: 20,
    * })
+   *
+   * const recipe = await session.respond('A quick pasta recipe', {
+   *   schema: z.object({ title: z.string(), ingredients: z.array(z.string()) }),
+   * })
    * ```
    */
-  async respond(prompt: string, options?: GenerationOptions): Promise<string> {
+  respond<S extends ObjectSchema>(
+    prompt: string,
+    options: StructuredGenerationOptions<S>,
+  ): Promise<z.infer<S>>
+  respond(prompt: string, options?: GenerationOptions): Promise<string>
+  async respond(prompt: string, options?: MaybeStructuredOptions): Promise<unknown> {
+    const schema = options?.schema
     try {
-      return await this.session.respond(prompt, toNativeGenerationOptions(options))
+      const nativeOptions = toNativeGenerationOptions(options)
+      if (!schema) {
+        return await this.session.respond(prompt, nativeOptions)
+      }
+      const json = await this.session.respondWithSchema(
+        prompt,
+        toGenerationSchema(schema, 'response'),
+        nativeOptions,
+      )
+      return parseResponse(schema, json)
     } catch (error) {
       throw parseNativeError(error, {
         fallbackCode: 'SESSION_RESPONSE_ERROR',
@@ -216,59 +251,89 @@ export class LanguageModelSession {
    * Streams a response from the language model. `onChunk` receives the full
    * response so far each time it grows.
    *
+   * With a `schema`, `onChunk` receives the partial object generated so far and
+   * the promise resolves with the value parsed by the schema. Partial objects
+   * are not validated.
+   *
    * Invalid `options` reject with an `INVALID_GENERATION_OPTIONS` error before
    * the request reaches the model.
    *
    * @example
    * ```typescript
    * await session.streamResponse('Write a haiku', setText, { temperature: 0.2 })
+   *
+   * const recipe = await session.streamResponse('A quick pasta recipe', setDraft, {
+   *   schema: Recipe,
+   * })
    * ```
    */
-  async streamResponse(
+  streamResponse<S extends ObjectSchema>(
+    prompt: string,
+    onChunk: (partial: DeepPartial<z.input<S>>) => void,
+    options: StructuredGenerationOptions<S>,
+  ): Promise<z.infer<S>>
+  streamResponse(
     prompt: string,
     onChunk: (chunk: string) => void,
     options?: GenerationOptions,
-  ): Promise<string> {
-    let callbackError: unknown
-    let callbackDidFail = false
+  ): Promise<string>
+  async streamResponse(
+    prompt: string,
+    onChunk: (chunk: any) => void,
+    options?: MaybeStructuredOptions,
+  ): Promise<unknown> {
+    const schema = options?.schema
+    const decode = schema ? parseResponseJson : (chunk: string) => chunk
+    let streamFailure: AppleAIError | undefined
 
     const safeOnChunk = (chunk: string) => {
-      if (callbackDidFail) {
+      if (streamFailure) {
+        return
+      }
+
+      let value: unknown
+      try {
+        value = decode(chunk)
+      } catch (error) {
+        streamFailure = parseNativeError(error)
         return
       }
 
       try {
-        onChunk(chunk)
+        onChunk(value)
       } catch (error) {
         // Nitro dispatches void callbacks asynchronously and cannot propagate
         // their exceptions back to this promise. Capture the first exception so
         // it cannot escape as an uncaught native C++ runtime error.
-        callbackDidFail = true
-        callbackError = error
-      }
-    }
-
-    try {
-      const response = await this.session.streamResponse(
-        prompt,
-        safeOnChunk,
-        toNativeGenerationOptions(options),
-      )
-
-      if (callbackDidFail) {
-        const callbackCause = parseNativeError(callbackError)
-        throw new AppleAIError(
+        const callbackCause = parseNativeError(error)
+        streamFailure = new AppleAIError(
           'STREAM_CALLBACK_ERROR',
           `Streaming callback failed: ${callbackCause.message}`,
           {
             operation: 'streamResponse.onChunk',
             causeCode: callbackCause.code,
           },
-          { cause: callbackError },
+          { cause: error },
         )
       }
+    }
 
-      return response
+    try {
+      const nativeOptions = toNativeGenerationOptions(options)
+      const response = schema
+        ? await this.session.streamResponseWithSchema(
+            prompt,
+            toGenerationSchema(schema, 'response'),
+            safeOnChunk,
+            nativeOptions,
+          )
+        : await this.session.streamResponse(prompt, safeOnChunk, nativeOptions)
+
+      if (streamFailure) {
+        throw streamFailure
+      }
+
+      return schema ? parseResponse(schema, response) : response
     } catch (error) {
       throw parseNativeError(error, {
         fallbackCode: 'SESSION_STREAMING_ERROR',

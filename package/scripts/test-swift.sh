@@ -25,6 +25,6 @@ run_suite() {
 check_stand_in NativeGenerationOptions
 
 run_suite streaming ios/StreamingResponseAccumulator.swift tests/StreamingResponseAccumulatorTests.swift
-run_suite tool-schema ios/ToolSchemaBuilder.swift tests/ToolSchemaBuilderTests.swift
+run_suite schema ios/GenerationSchemaBuilder.swift ios/ToolContent.swift tests/GenerationSchemaBuilderTests.swift
 run_suite generation-failure ios/GenerationFailure.swift tests/GenerationFailureTests.swift
 run_suite generation-options ios/GenerationOptionsMapping.swift tests/GenerationOptionsMappingTests.swift

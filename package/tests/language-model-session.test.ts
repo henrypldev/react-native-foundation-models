@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
+import type { AnyMap } from 'react-native-nitro-modules'
+import { z } from 'zod'
 import type { NativeGenerationOptions } from '../src/specs/LanguageModelSession.nitro'
 
 interface NativeSessionMock {
@@ -6,6 +8,17 @@ interface NativeSessionMock {
   streamResponse: (
     prompt: string,
     onChunk: (chunk: string) => void,
+    options?: NativeGenerationOptions,
+  ) => Promise<string>
+  respondWithSchema: (
+    prompt: string,
+    schema: AnyMap,
+    options?: NativeGenerationOptions,
+  ) => Promise<string>
+  streamResponseWithSchema: (
+    prompt: string,
+    schema: AnyMap,
+    onChunk: (json: string) => void,
     options?: NativeGenerationOptions,
   ) => Promise<string>
   tokenCount: (prompt: string) => Promise<number>
@@ -43,6 +56,8 @@ beforeEach(() => {
       onChunk('complete')
       return 'complete'
     },
+    respondWithSchema: async () => '{}',
+    streamResponseWithSchema: async () => '{}',
     tokenCount: async () => 3,
     wasContextReset: false,
   }
@@ -177,5 +192,187 @@ describe('LanguageModelSession native boundary', () => {
     })
     expect(respond).not.toHaveBeenCalled()
     expect(streamResponse).not.toHaveBeenCalled()
+  })
+})
+
+const Recipe = z.object({
+  title: z.string(),
+  difficulty: z.enum(['easy', 'hard']),
+  ingredients: z.array(z.object({ name: z.string(), grams: z.number() })),
+  servings: z.number().default(2),
+})
+
+const recipeJson = JSON.stringify({
+  title: 'Pasta',
+  difficulty: 'easy',
+  ingredients: [{ name: 'spaghetti', grams: 200 }],
+})
+
+describe('LanguageModelSession structured output', () => {
+  test('sends the sanitized response schema and resolves with the parsed value', async () => {
+    const respondWithSchema = mock(async () => recipeJson)
+    nativeSession.respondWithSchema = respondWithSchema
+
+    const session = new LanguageModelSession()
+    const recipe = await session.respond('A pasta recipe', {
+      schema: Recipe,
+      samplingMode: { kind: 'greedy' },
+    })
+
+    expect(recipe).toEqual({
+      title: 'Pasta',
+      difficulty: 'easy',
+      ingredients: [{ name: 'spaghetti', grams: 200 }],
+      servings: 2,
+    })
+    expect(respondWithSchema).toHaveBeenCalledWith(
+      'A pasta recipe',
+      {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          difficulty: { type: 'string', enum: ['easy', 'hard'] },
+          ingredients: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: { name: { type: 'string' }, grams: { type: 'number' } },
+              required: ['name', 'grams'],
+            },
+          },
+          servings: { type: 'number' },
+        },
+        required: ['title', 'difficulty', 'ingredients'],
+      },
+      expect.objectContaining({ samplingMode: 'greedy' }),
+    )
+  })
+
+  test('rejects a response that does not match the schema with the Zod issues', async () => {
+    nativeSession.respondWithSchema = async () =>
+      JSON.stringify({ title: 'Pasta', difficulty: 'medium', ingredients: [] })
+
+    const session = new LanguageModelSession()
+
+    await expect(
+      session.respond('A pasta recipe', { schema: Recipe }),
+    ).rejects.toMatchObject({
+      name: 'AppleAIError',
+      code: 'RESPONSE_VALIDATION_ERROR',
+      details: {
+        issues: [expect.objectContaining({ path: ['difficulty'] })],
+        response: { title: 'Pasta', difficulty: 'medium', ingredients: [] },
+      },
+    })
+  })
+
+  test('rejects a response that is not JSON', async () => {
+    nativeSession.respondWithSchema = async () => '{"title": "Pas'
+
+    const session = new LanguageModelSession()
+
+    await expect(
+      session.respond('A pasta recipe', { schema: Recipe }),
+    ).rejects.toMatchObject({
+      code: 'RESPONSE_VALIDATION_ERROR',
+      details: { response: '{"title": "Pas' },
+    })
+  })
+
+  test('rejects an unsupported schema before the request reaches native', async () => {
+    const respondWithSchema = mock(async () => '{}')
+    nativeSession.respondWithSchema = respondWithSchema
+
+    const session = new LanguageModelSession()
+
+    await expect(
+      session.respond('Hello', {
+        schema: z.object({ id: z.union([z.string(), z.number()]) }),
+      }),
+    ).rejects.toMatchObject({
+      code: 'SCHEMA_CREATION_ERROR',
+      message: expect.stringContaining("'response.id'"),
+    })
+    expect(respondWithSchema).not.toHaveBeenCalled()
+  })
+
+  test('rejects a schema without an object at the root', async () => {
+    const session = new LanguageModelSession()
+
+    await expect(
+      session.respond('Hello', { schema: z.string() as never }),
+    ).rejects.toMatchObject({
+      code: 'SCHEMA_CREATION_ERROR',
+      message: expect.stringContaining("'response'"),
+    })
+  })
+
+  test('preserves typed native failures from the schema request', async () => {
+    nativeSession.respondWithSchema = async () => {
+      throw new Error('[CONTEXT_EXCEEDED] The context window is full')
+    }
+
+    const session = new LanguageModelSession()
+
+    await expect(session.respond('Hello', { schema: Recipe })).rejects.toMatchObject({
+      code: 'CONTEXT_EXCEEDED',
+    })
+  })
+
+  test('streams unvalidated partial objects and resolves with the parsed value', async () => {
+    nativeSession.streamResponseWithSchema = async (_prompt, _schema, onChunk) => {
+      onChunk('{"title": "Pa"}')
+      onChunk('{"difficulty": "", "title": "Pasta"}')
+      onChunk('{"title": "Pasta", "difficulty": "easy", "ingredients": [{}]}')
+      onChunk(recipeJson)
+      return recipeJson
+    }
+    const partials: unknown[] = []
+
+    const session = new LanguageModelSession()
+    const recipe = await session.streamResponse(
+      'A pasta recipe',
+      partial => partials.push(partial),
+      { schema: Recipe },
+    )
+
+    expect(partials).toEqual([
+      { title: 'Pa' },
+      { difficulty: '', title: 'Pasta' },
+      { title: 'Pasta', difficulty: 'easy', ingredients: [{}] },
+      JSON.parse(recipeJson),
+    ])
+    expect(recipe.servings).toBe(2)
+  })
+
+  test('rejects a stream whose final value does not match the schema', async () => {
+    nativeSession.streamResponseWithSchema = async (_prompt, _schema, onChunk) => {
+      onChunk('{"title": "Pasta"}')
+      return '{"title": "Pasta"}'
+    }
+
+    const session = new LanguageModelSession()
+
+    await expect(
+      session.streamResponse('A pasta recipe', () => {}, { schema: Recipe }),
+    ).rejects.toMatchObject({
+      code: 'RESPONSE_VALIDATION_ERROR',
+      message: expect.stringContaining('difficulty'),
+    })
+  })
+
+  test('rejects a stream whose snapshot is not JSON instead of blaming the callback', async () => {
+    const onChunk = mock(() => {})
+    nativeSession.streamResponseWithSchema = async (_prompt, _schema, emit) => {
+      emit('{"title": "Pa')
+      return recipeJson
+    }
+
+    const session = new LanguageModelSession()
+
+    await expect(
+      session.streamResponse('A pasta recipe', onChunk, { schema: Recipe }),
+    ).rejects.toMatchObject({ code: 'RESPONSE_VALIDATION_ERROR' })
+    expect(onChunk).not.toHaveBeenCalled()
   })
 })

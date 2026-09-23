@@ -35,6 +35,17 @@ export interface LanguageModelSession extends HybridObject<{ ios: 'swift' }> {
     onStream: (stream: string) => void,
     options?: NativeGenerationOptions,
   ): Promise<string>
+  respondWithSchema(
+    prompt: string,
+    schema: AnyMap,
+    options?: NativeGenerationOptions,
+  ): Promise<string>
+  streamResponseWithSchema(
+    prompt: string,
+    schema: AnyMap,
+    onStream: (json: string) => void,
+    options?: NativeGenerationOptions,
+  ): Promise<string>
   tokenCount(prompt: string): Promise<number>
   readonly wasContextReset: boolean
 }

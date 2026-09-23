@@ -15,6 +15,8 @@ public protocol HybridLanguageModelSessionSpec_protocol: HybridObject {
   // Methods
   func respond(prompt: String, options: NativeGenerationOptions?) throws -> Promise<String>
   func streamResponse(prompt: String, onStream: @escaping (_ stream: String) -> Void, options: NativeGenerationOptions?) throws -> Promise<String>
+  func respondWithSchema(prompt: String, schema: AnyMap, options: NativeGenerationOptions?) throws -> Promise<String>
+  func streamResponseWithSchema(prompt: String, schema: AnyMap, onStream: @escaping (_ json: String) -> Void, options: NativeGenerationOptions?) throws -> Promise<String>
   func tokenCount(prompt: String) throws -> Promise<Double>
 }
 

@@ -21,6 +21,7 @@ namespace margelo::nitro::rnfoundationmodels { struct NativeGenerationOptions; }
 #include "NativeGenerationOptions.hpp"
 #include <optional>
 #include <functional>
+#include <NitroModules/AnyMap.hpp>
 
 namespace margelo::nitro::rnfoundationmodels {
 
@@ -55,6 +56,8 @@ namespace margelo::nitro::rnfoundationmodels {
       // Methods
       virtual std::shared_ptr<Promise<std::string>> respond(const std::string& prompt, const std::optional<NativeGenerationOptions>& options) = 0;
       virtual std::shared_ptr<Promise<std::string>> streamResponse(const std::string& prompt, const std::function<void(const std::string& /* stream */)>& onStream, const std::optional<NativeGenerationOptions>& options) = 0;
+      virtual std::shared_ptr<Promise<std::string>> respondWithSchema(const std::string& prompt, const std::shared_ptr<AnyMap>& schema, const std::optional<NativeGenerationOptions>& options) = 0;
+      virtual std::shared_ptr<Promise<std::string>> streamResponseWithSchema(const std::string& prompt, const std::shared_ptr<AnyMap>& schema, const std::function<void(const std::string& /* json */)>& onStream, const std::optional<NativeGenerationOptions>& options) = 0;
       virtual std::shared_ptr<Promise<double>> tokenCount(const std::string& prompt) = 0;
 
     protected:
