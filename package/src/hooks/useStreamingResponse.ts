@@ -2,8 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AppleAIError } from '../errors'
 import { isAppleAIError, parseNativeError } from '../errors'
 import type { LanguageModelSession } from '../LanguageModelSession'
+import type { GenerationOptions } from '../types'
 
-export interface StreamingOptions {
+/**
+ * Callbacks for one streamed request, plus the generation options it uses.
+ */
+export interface StreamingOptions extends GenerationOptions {
   onToken?: (token: string) => void
   onComplete?: (fullResponse: string) => void
   onError?: (error: AppleAIError) => void
@@ -76,6 +80,7 @@ export function useStreamingResponse(
             setResponse(streamedResponse)
             options?.onToken?.(streamedResponse)
           },
+          options,
         )
 
         activeStreamRef.current = streamPromise

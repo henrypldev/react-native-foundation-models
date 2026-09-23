@@ -1,6 +1,7 @@
 import { Platform } from 'react-native'
 import { NitroModules } from 'react-native-nitro-modules'
 import { AppleAIError, parseNativeError } from './errors'
+import { toNativeGenerationOptions } from './generation-options'
 import type {
   LanguageModelSessionConfig,
   LanguageModelSessionFactory as LanguageModelSessionFactorySpec,
@@ -10,6 +11,7 @@ import type {
   AvailabilityStatus,
   FoundationModelsAvailability,
   FoundationModelsModelFamily,
+  GenerationOptions,
   SystemLanguageModelGuardrails,
   SystemLanguageModelUseCase,
 } from './types'
@@ -187,10 +189,21 @@ export class LanguageModelSession {
 
   /**
    * Generates a complete response from the language model and resolves when finished.
+   *
+   * Invalid `options` reject with an `INVALID_GENERATION_OPTIONS` error before
+   * the request reaches the model.
+   *
+   * @example
+   * ```typescript
+   * const answer = await session.respond('Name a color', {
+   *   samplingMode: { kind: 'greedy' },
+   *   maximumResponseTokens: 20,
+   * })
+   * ```
    */
-  async respond(prompt: string): Promise<string> {
+  async respond(prompt: string, options?: GenerationOptions): Promise<string> {
     try {
-      return await this.session.respond(prompt)
+      return await this.session.respond(prompt, toNativeGenerationOptions(options))
     } catch (error) {
       throw parseNativeError(error, {
         fallbackCode: 'SESSION_RESPONSE_ERROR',
@@ -200,12 +213,21 @@ export class LanguageModelSession {
   }
 
   /**
-   * Initiates a streaming response from the language model
-   * This method starts the AI conversation and streams the response back
+   * Streams a response from the language model. `onChunk` receives the full
+   * response so far each time it grows.
+   *
+   * Invalid `options` reject with an `INVALID_GENERATION_OPTIONS` error before
+   * the request reaches the model.
+   *
+   * @example
+   * ```typescript
+   * await session.streamResponse('Write a haiku', setText, { temperature: 0.2 })
+   * ```
    */
   async streamResponse(
     prompt: string,
     onChunk: (chunk: string) => void,
+    options?: GenerationOptions,
   ): Promise<string> {
     let callbackError: unknown
     let callbackDidFail = false
@@ -227,7 +249,11 @@ export class LanguageModelSession {
     }
 
     try {
-      const response = await this.session.streamResponse(prompt, safeOnChunk)
+      const response = await this.session.streamResponse(
+        prompt,
+        safeOnChunk,
+        toNativeGenerationOptions(options),
+      )
 
       if (callbackDidFail) {
         const callbackCause = parseNativeError(callbackError)

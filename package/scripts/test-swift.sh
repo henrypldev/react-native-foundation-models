@@ -24,3 +24,10 @@ swiftc -parse-as-library -module-cache-path "$CACHE" \
   tests/GenerationFailureTests.swift \
   -o /tmp/rn-foundation-models-generation-failure-tests
 /tmp/rn-foundation-models-generation-failure-tests
+
+swiftc -parse-as-library -module-cache-path "$CACHE" \
+  ios/AppleAIErrors.swift \
+  ios/GenerationOptionsMapping.swift \
+  tests/GenerationOptionsMappingTests.swift \
+  -o /tmp/rn-foundation-models-generation-options-tests
+/tmp/rn-foundation-models-generation-options-tests

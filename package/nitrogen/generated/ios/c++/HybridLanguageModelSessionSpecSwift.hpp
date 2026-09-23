@@ -12,10 +12,19 @@
 // Forward declaration of `HybridLanguageModelSessionSpec_cxx` to properly resolve imports.
 namespace RNFoundationModels { class HybridLanguageModelSessionSpec_cxx; }
 
-
+// Forward declaration of `NativeGenerationOptions` to properly resolve imports.
+namespace margelo::nitro::rnfoundationmodels { struct NativeGenerationOptions; }
+// Forward declaration of `NativeSamplingMode` to properly resolve imports.
+namespace margelo::nitro::rnfoundationmodels { enum class NativeSamplingMode; }
+// Forward declaration of `NativeToolCallingMode` to properly resolve imports.
+namespace margelo::nitro::rnfoundationmodels { enum class NativeToolCallingMode; }
 
 #include <string>
 #include <NitroModules/Promise.hpp>
+#include "NativeGenerationOptions.hpp"
+#include <optional>
+#include "NativeSamplingMode.hpp"
+#include "NativeToolCallingMode.hpp"
 #include <functional>
 
 #include "RNFoundationModels-Swift-Cxx-Umbrella.hpp"
@@ -70,16 +79,16 @@ namespace margelo::nitro::rnfoundationmodels {
 
   public:
     // Methods
-    inline std::shared_ptr<Promise<std::string>> respond(const std::string& prompt) override {
-      auto __result = _swiftPart.respond(prompt);
+    inline std::shared_ptr<Promise<std::string>> respond(const std::string& prompt, const std::optional<NativeGenerationOptions>& options) override {
+      auto __result = _swiftPart.respond(prompt, options);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
       auto __value = std::move(__result.value());
       return __value;
     }
-    inline std::shared_ptr<Promise<std::string>> streamResponse(const std::string& prompt, const std::function<void(const std::string& /* stream */)>& onStream) override {
-      auto __result = _swiftPart.streamResponse(prompt, onStream);
+    inline std::shared_ptr<Promise<std::string>> streamResponse(const std::string& prompt, const std::function<void(const std::string& /* stream */)>& onStream, const std::optional<NativeGenerationOptions>& options) override {
+      auto __result = _swiftPart.streamResponse(prompt, onStream, options);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

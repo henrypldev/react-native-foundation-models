@@ -12,6 +12,12 @@
 namespace margelo::nitro::rnfoundationmodels { class HybridLanguageModelSessionFactorySpec; }
 // Forward declaration of `HybridLanguageModelSessionSpec` to properly resolve imports.
 namespace margelo::nitro::rnfoundationmodels { class HybridLanguageModelSessionSpec; }
+// Forward declaration of `NativeGenerationOptions` to properly resolve imports.
+namespace margelo::nitro::rnfoundationmodels { struct NativeGenerationOptions; }
+// Forward declaration of `NativeSamplingMode` to properly resolve imports.
+namespace margelo::nitro::rnfoundationmodels { enum class NativeSamplingMode; }
+// Forward declaration of `NativeToolCallingMode` to properly resolve imports.
+namespace margelo::nitro::rnfoundationmodels { enum class NativeToolCallingMode; }
 // Forward declaration of `ToolDefinition` to properly resolve imports.
 namespace margelo::nitro::rnfoundationmodels { struct ToolDefinition; }
 
@@ -24,6 +30,9 @@ namespace RNFoundationModels { class HybridLanguageModelSessionSpec_cxx; }
 // Include C++ defined types
 #include "HybridLanguageModelSessionFactorySpec.hpp"
 #include "HybridLanguageModelSessionSpec.hpp"
+#include "NativeGenerationOptions.hpp"
+#include "NativeSamplingMode.hpp"
+#include "NativeToolCallingMode.hpp"
 #include "ToolDefinition.hpp"
 #include <NitroModules/AnyMap.hpp>
 #include <NitroModules/Promise.hpp>
@@ -96,6 +105,66 @@ namespace margelo::nitro::rnfoundationmodels::bridge::swift {
   Func_void_std__exception_ptr create_Func_void_std__exception_ptr(void* NON_NULL swiftClosureWrapper) noexcept;
   inline Func_void_std__exception_ptr_Wrapper wrap_Func_void_std__exception_ptr(Func_void_std__exception_ptr value) noexcept {
     return Func_void_std__exception_ptr_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::optional<double>
+  /**
+   * Specialized version of `std::optional<double>`.
+   */
+  using std__optional_double_ = std::optional<double>;
+  inline std::optional<double> create_std__optional_double_(const double& value) noexcept {
+    return std::optional<double>(value);
+  }
+  inline bool has_value_std__optional_double_(const std::optional<double>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline double get_std__optional_double_(const std::optional<double>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::optional<NativeSamplingMode>
+  /**
+   * Specialized version of `std::optional<NativeSamplingMode>`.
+   */
+  using std__optional_NativeSamplingMode_ = std::optional<NativeSamplingMode>;
+  inline std::optional<NativeSamplingMode> create_std__optional_NativeSamplingMode_(const NativeSamplingMode& value) noexcept {
+    return std::optional<NativeSamplingMode>(value);
+  }
+  inline bool has_value_std__optional_NativeSamplingMode_(const std::optional<NativeSamplingMode>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline NativeSamplingMode get_std__optional_NativeSamplingMode_(const std::optional<NativeSamplingMode>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::optional<NativeToolCallingMode>
+  /**
+   * Specialized version of `std::optional<NativeToolCallingMode>`.
+   */
+  using std__optional_NativeToolCallingMode_ = std::optional<NativeToolCallingMode>;
+  inline std::optional<NativeToolCallingMode> create_std__optional_NativeToolCallingMode_(const NativeToolCallingMode& value) noexcept {
+    return std::optional<NativeToolCallingMode>(value);
+  }
+  inline bool has_value_std__optional_NativeToolCallingMode_(const std::optional<NativeToolCallingMode>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline NativeToolCallingMode get_std__optional_NativeToolCallingMode_(const std::optional<NativeToolCallingMode>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::optional<NativeGenerationOptions>
+  /**
+   * Specialized version of `std::optional<NativeGenerationOptions>`.
+   */
+  using std__optional_NativeGenerationOptions_ = std::optional<NativeGenerationOptions>;
+  inline std::optional<NativeGenerationOptions> create_std__optional_NativeGenerationOptions_(const NativeGenerationOptions& value) noexcept {
+    return std::optional<NativeGenerationOptions>(value);
+  }
+  inline bool has_value_std__optional_NativeGenerationOptions_(const std::optional<NativeGenerationOptions>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline NativeGenerationOptions get_std__optional_NativeGenerationOptions_(const std::optional<NativeGenerationOptions>& optional) noexcept {
+    return optional.value();
   }
   
   // pragma MARK: std::shared_ptr<Promise<double>>
@@ -291,21 +360,6 @@ namespace margelo::nitro::rnfoundationmodels::bridge::swift {
     return optional.has_value();
   }
   inline std::vector<ToolDefinition> get_std__optional_std__vector_ToolDefinition__(const std::optional<std::vector<ToolDefinition>>& optional) noexcept {
-    return optional.value();
-  }
-  
-  // pragma MARK: std::optional<double>
-  /**
-   * Specialized version of `std::optional<double>`.
-   */
-  using std__optional_double_ = std::optional<double>;
-  inline std::optional<double> create_std__optional_double_(const double& value) noexcept {
-    return std::optional<double>(value);
-  }
-  inline bool has_value_std__optional_double_(const std::optional<double>& optional) noexcept {
-    return optional.has_value();
-  }
-  inline double get_std__optional_double_(const std::optional<double>& optional) noexcept {
     return optional.value();
   }
   
