@@ -1,10 +1,13 @@
 import type { LanguageModelSession } from 'react-native-foundation-models'
 
 export interface TokenMetrics {
-  promptTokens: number
-  responseTokens: number
+  inputTokens: number
+  outputTokens: number
   totalTokens: number
   estimated: boolean
+  cachedInputTokens?: number
+  reasoningTokens?: number
+  sessionTokens?: number
 }
 
 /**
@@ -26,26 +29,39 @@ export async function getTokenMetrics(
   prompt: string,
   response: string,
 ): Promise<TokenMetrics> {
+  const usage = session.lastResponseUsage
+  if (usage) {
+    return {
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      totalTokens: usage.totalTokens,
+      estimated: false,
+      cachedInputTokens: usage.cachedInputTokens,
+      reasoningTokens: usage.reasoningTokens,
+      sessionTokens: session.usage?.totalTokens,
+    }
+  }
+
   try {
-    const [promptTokens, responseTokens] = await Promise.all([
+    const [inputTokens, outputTokens] = await Promise.all([
       session.tokenCount(prompt),
       session.tokenCount(response),
     ])
 
     return {
-      promptTokens,
-      responseTokens,
-      totalTokens: promptTokens + responseTokens,
+      inputTokens,
+      outputTokens,
+      totalTokens: inputTokens + outputTokens,
       estimated: false,
     }
   } catch {
-    const promptTokens = estimateTokenCount(prompt)
-    const responseTokens = estimateTokenCount(response)
+    const inputTokens = estimateTokenCount(prompt)
+    const outputTokens = estimateTokenCount(response)
 
     return {
-      promptTokens,
-      responseTokens,
-      totalTokens: promptTokens + responseTokens,
+      inputTokens,
+      outputTokens,
+      totalTokens: inputTokens + outputTokens,
       estimated: true,
     }
   }

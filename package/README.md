@@ -66,6 +66,14 @@ await session.streamResponse('Write a haiku', onChunk, {
 
 Fields: `temperature`, `maximumResponseTokens`, `samplingMode` (`greedy`, `randomTopK`, or `randomProbabilityThreshold`), and `toolCallingMode` (`allowed`, `required`, or `disallowed`). `toolCallingMode` needs iOS 27 or later. iOS 26 ignores it. With `required`, the model calls a tool at every step and may not end the request. Invalid values reject with an `INVALID_GENERATION_OPTIONS` error.
 
+`reasoningLevel` (`light`, `moderate`, or `deep`) sets how much the model reasons before it answers. It needs iOS 27 or later and a model with the `reasoning` capability. iOS 26 ignores it. A model without the capability, such as `AFM 3 Core`, rejects the request with `UNSUPPORTED_CAPABILITY`.
+
+```typescript
+const { capabilities } = checkFoundationModelsAvailability();
+const reasoningLevel = capabilities?.includes('reasoning') ? 'moderate' : undefined;
+await session.respond('Plan a 3 day trip', { reasoningLevel });
+```
+
 In a session with tools, a very small `maximumResponseTokens` (for example 5) can reject with `DECODING_FAILURE`, because the model uses tokens to decide on tool calls before it writes the answer.
 
 ### Structured output
@@ -97,6 +105,20 @@ While the stream runs, `onChunk` receives the object generated so far. Fields ap
 The schema must have `z.object` at the root and follows the same rules as tool arguments (see `createTool` in the API reference). An unsupported schema rejects with `SCHEMA_CREATION_ERROR` before the request. A final value that does not parse (for example, it fails a `.refine()` check the model cannot see) rejects with `RESPONSE_VALIDATION_ERROR`, and `error.details.issues` holds the Zod issues.
 
 The hooks return text only. Call `session.respond` or `session.streamResponse` directly for structured output.
+
+### Token usage
+
+On iOS 27 and later, the session reports the tokens Apple counted. Both values are `undefined` on iOS 26.
+
+```typescript
+await session.respond('Plan a 3 day trip');
+session.lastResponseUsage;
+// { inputTokens, cachedInputTokens, outputTokens, reasoningTokens, totalTokens }
+session.usage;
+// the same fields, summed over every request in the session
+```
+
+`lastResponseUsage.inputTokens` counts the whole conversation the model read, so `inputTokens + outputTokens` is how full the context window is. `usage` keeps counting after a context overflow reset. A session restored from a transcript starts from zero. When the model calls tools, `lastResponseUsage` counts only the final pass and `usage` counts every pass, so use `usage` for budgets.
 
 ### Saving and restoring a conversation
 
@@ -192,6 +214,8 @@ Methods:
 - `streamResponse(prompt, onChunk, options?)` - Stream the response progressively. With `options.schema`, `onChunk` receives partial objects
 - `prewarm(promptPrefix?)` - Load the model resources before the first request
 - `transcript` - The conversation so far as a `SerializedTranscript`, to restore with `new LanguageModelSession({ transcript })`
+- `usage` - Tokens used by all requests in this session (iOS 27+)
+- `lastResponseUsage` - Tokens used by the latest request (iOS 27+)
 
 ### `useLanguageModel(config)`
 
@@ -217,11 +241,13 @@ Check if Apple Intelligence is available on the device.
 The returned object also includes:
 
 - `contextSize`: current library context budget in tokens
-- `modelFamily`: `'26.0-26.3'` or `'26.4+'` based on the OS version
+- `modelFamily`: `'26.0-26.3'` or `'26.4+'` based on the OS version (deprecated)
+- `variant`: the model display name, for example `'AFM 3 Core'` (iOS 27+)
+- `capabilities`: the model features, a list of `'vision'`, `'guidedGeneration'`, `'reasoning'`, and `'toolCalling'` (iOS 27+)
 
 ### `getFoundationModelsModelFamily()`
 
-Returns the Foundation Models family for the current OS version: `'26.0-26.3'` or `'26.4+'`.
+Deprecated. Returns a guess from the OS version: `'26.0-26.3'` or `'26.4+'`. Every iOS 27 model reports `'26.4+'`, so read `variant` on iOS 27 and later.
 
 ### `getFoundationModelsContextSize()`
 

@@ -125,6 +125,35 @@ Boolean flag indicating whether the session's context was automatically summariz
 readonly wasContextReset: boolean
 ```
 
+#### `usage`
+
+Tokens used by every completed request in this session. iOS 27 and later only. `undefined` on iOS 26.
+
+```typescript
+readonly usage: TokenUsage | undefined
+```
+
+The count includes the summary request of a context overflow reset, so it does not go down when the session is replaced. A session restored from a transcript starts again from zero.
+
+#### `lastResponseUsage`
+
+Tokens used by the latest `respond` or `streamResponse` call. iOS 27 and later only. `undefined` on iOS 26, before the first request, and after a request that failed.
+
+```typescript
+readonly lastResponseUsage: TokenUsage | undefined
+```
+
+`inputTokens` covers the whole conversation the model read for this request, including instructions and tool definitions. `inputTokens + outputTokens` is therefore how much of the context window the session fills after the request.
+
+When the model calls tools, a request has more than one model pass. `lastResponseUsage` counts only the final pass that wrote the answer, and `usage` counts every pass. On the iOS 27.0 simulator, one request with one tool call reported 356 tokens in `lastResponseUsage` and 660 in `usage`.
+
+```typescript
+await session.respond('Plan a 3 day trip');
+session.lastResponseUsage; // { inputTokens: 61, cachedInputTokens: 0, outputTokens: 13, reasoningTokens: 0, totalTokens: 74 }
+await session.respond('Make it 2 days');
+session.usage?.totalTokens; // both requests together
+```
+
 #### `transcript`
 
 The conversation so far, including the instructions. Each read returns the current state. After a context overflow the session is replaced by a summarized one, and `transcript` reads the replacement.
@@ -156,9 +185,20 @@ function checkFoundationModelsAvailability(): FoundationModelsAvailability
 
 The returned object also includes:
 - `contextSize?: number`
-- `modelFamily?: '26.0-26.3' | '26.4+'`
+- `modelFamily?: '26.0-26.3' | '26.4+'` (deprecated, see below)
+- `variant?: string` - The display name of the on-device model, for example `'AFM 3 Core'`. iOS 27 and later only
+- `capabilities?: ModelCapability[]` - The features the on-device model supports. iOS 27 and later only
+
+```typescript
+checkFoundationModelsAvailability();
+// { isAvailable: true, status: 'available', ..., variant: 'AFM 3 Core', capabilities: ['vision', 'guidedGeneration', 'toolCalling'] }
+```
+
+The model differs between devices. Check `capabilities` before you use a feature that not every model has, such as `reasoningLevel`.
 
 ### `getFoundationModelsModelFamily()`
+
+**Deprecated.** The value is guessed from the iOS version, and every iOS 27 model reports `'26.4+'`. On iOS 27 and later, read `variant` from `checkFoundationModelsAvailability()`. iOS 26 does not report a model name, so the guess stays for iOS 26.
 
 ```typescript
 function getFoundationModelsModelFamily(): '26.0-26.3' | '26.4+' | undefined
@@ -228,9 +268,32 @@ interface FoundationModelsAvailability {
   status: AvailabilityStatus;
   message: string;
   contextSize?: number;
+  /** @deprecated */
   modelFamily?: '26.0-26.3' | '26.4+';
+  variant?: string;
+  capabilities?: ModelCapability[];
+}
+
+type ModelCapability = 'vision' | 'guidedGeneration' | 'reasoning' | 'toolCalling';
+```
+
+### `TokenUsage`
+
+Token counts that Apple reports for requests. iOS 27 and later only.
+
+```typescript
+interface TokenUsage {
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  totalTokens: number;
 }
 ```
+
+- `cachedInputTokens` - The part of `inputTokens` the model read from its cache. In a conversation, earlier turns are usually cached
+- `reasoningTokens` - The part of `outputTokens` the model spent on reasoning
+- `totalTokens` - `inputTokens + outputTokens`
 
 ### `AvailabilityStatus`
 
@@ -254,6 +317,7 @@ interface GenerationOptions {
   maximumResponseTokens?: number;
   samplingMode?: SamplingMode;
   toolCallingMode?: ToolCallingMode;
+  reasoningLevel?: ReasoningLevel;
 }
 
 type SamplingMode =
@@ -262,12 +326,15 @@ type SamplingMode =
   | { kind: 'randomProbabilityThreshold'; probabilityThreshold: number; seed?: number };
 
 type ToolCallingMode = 'allowed' | 'required' | 'disallowed';
+
+type ReasoningLevel = 'light' | 'moderate' | 'deep';
 ```
 
 - `temperature` - A finite number of 0 or more. Lower values give more predictable output.
 - `maximumResponseTokens` - A positive integer. The response stops at this many tokens. In a session with tools, a very small value (for example 5) can reject with `DECODING_FAILURE`.
 - `samplingMode` - How the model picks each token. `greedy` always picks the most likely token. `randomTopK` samples from the `top` most likely tokens (`top` is an integer of 1 or more). `randomProbabilityThreshold` samples from the smallest set of tokens whose probabilities add up to `probabilityThreshold` (greater than 0, at most 1). `seed` is an optional non-negative integer that makes random sampling repeatable.
 - `toolCallingMode` - Whether the model may (`allowed`), must (`required`), or must not (`disallowed`) call tools. iOS 27 and later only. iOS 26 ignores it. With `required`, the model calls a tool at every step. On the iOS 27.0 simulator it kept calling the tool and the request did not end normally, so prefer `allowed` unless your tool loop has an exit.
+- `reasoningLevel` - How much the model reasons before it answers. iOS 27 and later only. iOS 26 ignores it. A model without the `reasoning` capability (for example `AFM 3 Core`) rejects the request with `UNSUPPORTED_CAPABILITY`. Check `checkFoundationModelsAvailability().capabilities` first.
 
 ### `StructuredGenerationOptions`
 

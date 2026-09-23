@@ -1,10 +1,13 @@
 import { useCallback, useState } from 'react'
 import { StyleSheet, Switch, TouchableOpacity } from 'react-native'
 import {
+  checkFoundationModelsAvailability,
   createTool,
   type GenerationOptions,
   getFoundationModelsContextSize,
   LanguageModelSession,
+  parseNativeError,
+  type ReasoningLevel,
   type SerializedTranscript,
 } from 'react-native-foundation-models'
 import { z } from 'zod'
@@ -51,6 +54,13 @@ const initialSession = new LanguageModelSession({
 })
 initialSession.prewarm()
 const contextSize = getFoundationModelsContextSize()
+const availability = checkFoundationModelsAvailability()
+const reasoningChoices: Array<{ label: string; level?: ReasoningLevel }> = [
+  { label: 'Off' },
+  { label: 'Light', level: 'light' },
+  { label: 'Moderate', level: 'moderate' },
+  { label: 'Deep', level: 'deep' },
+]
 
 export default function IndexScreen() {
   const [session, setSession] = useState(initialSession)
@@ -62,6 +72,7 @@ export default function IndexScreen() {
   const [contextReset, setContextReset] = useState(false)
   const [greedy, setGreedy] = useState(false)
   const [capTokens, setCapTokens] = useState(false)
+  const [reasoningLevel, setReasoningLevel] = useState<ReasoningLevel>()
   const mutedColor = useThemeColor({}, 'muted')
   const borderColor = useThemeColor({}, 'border')
   const cardColor = useThemeColor({}, 'card')
@@ -77,6 +88,7 @@ export default function IndexScreen() {
       const generationOptions: GenerationOptions = {
         samplingMode: greedy ? { kind: 'greedy' } : undefined,
         maximumResponseTokens: capTokens ? 30 : undefined,
+        reasoningLevel,
       }
 
       try {
@@ -86,14 +98,14 @@ export default function IndexScreen() {
         setContextReset(session.wasContextReset)
       } catch (error) {
         console.error('Failed to get response:', error)
-        setResult('Error: Failed to get response')
+        setResult(`Error: ${parseNativeError(error).code}`)
         setTokenMetrics(undefined)
         setContextReset(session.wasContextReset)
       } finally {
         setLoading(false)
       }
     },
-    [session, greedy, capTokens],
+    [session, greedy, capTokens, reasoningLevel],
   )
 
   const saveTranscript = () => {
@@ -137,6 +149,15 @@ export default function IndexScreen() {
       }}
     >
       <View style={[styles.card, { borderColor, backgroundColor: cardColor }]}>
+        <Text style={[styles.cardLabel, { color: mutedColor }]}>MODEL</Text>
+        <Text testID="model-variant">
+          {availability.variant ?? 'Variant needs iOS 27'}
+        </Text>
+        <Text testID="model-capabilities" style={{ color: mutedColor }}>
+          {availability.capabilities?.join(', ') ?? 'Capabilities need iOS 27'}
+        </Text>
+      </View>
+      <View style={[styles.card, { borderColor, backgroundColor: cardColor }]}>
         <Text style={[styles.cardLabel, { color: mutedColor }]}>GENERATION OPTIONS</Text>
         <View style={styles.row}>
           <Text style={styles.rowLabel}>Greedy sampling</Text>
@@ -156,6 +177,35 @@ export default function IndexScreen() {
             onValueChange={setCapTokens}
           />
         </View>
+        <Text style={styles.rowLabel}>Reasoning</Text>
+        <View style={styles.buttons}>
+          {reasoningChoices.map(choice => {
+            const selected = choice.level === reasoningLevel
+            return (
+              <TouchableOpacity
+                key={choice.label}
+                testID={`reasoning-${choice.label.toLowerCase()}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                onPress={() => setReasoningLevel(choice.level)}
+                style={[
+                  styles.chip,
+                  { borderColor: tintColor },
+                  selected && { backgroundColor: tintColor },
+                ]}
+              >
+                <Text style={{ color: selected ? '#FFFFFF' : tintColor }}>
+                  {choice.label}
+                </Text>
+              </TouchableOpacity>
+            )
+          })}
+        </View>
+        {availability.capabilities && !availability.capabilities.includes('reasoning') ? (
+          <Text style={{ color: mutedColor }}>
+            This model cannot reason. A reasoning level fails with UNSUPPORTED_CAPABILITY.
+          </Text>
+        ) : null}
       </View>
       <View style={[styles.card, { borderColor, backgroundColor: cardColor }]}>
         <Text style={[styles.cardLabel, { color: mutedColor }]}>TRANSCRIPT</Text>

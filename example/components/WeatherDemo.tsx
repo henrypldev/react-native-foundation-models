@@ -119,20 +119,41 @@ export function WeatherDemo({
           <PlainView style={[styles.divider, { backgroundColor: borderColor }]} />
 
           <MetricRow
-            label="Prompt tokens"
-            value={formatNumber(metrics?.tokens?.promptTokens)}
+            label="Input tokens"
+            value={formatNumber(metrics?.tokens?.inputTokens)}
             mutedColor={mutedColor}
           />
+          {metrics?.tokens?.cachedInputTokens !== undefined ? (
+            <MetricRow
+              label="Cached input tokens"
+              value={formatNumber(metrics.tokens.cachedInputTokens)}
+              mutedColor={mutedColor}
+            />
+          ) : null}
           <MetricRow
-            label="Response tokens"
-            value={formatNumber(metrics?.tokens?.responseTokens)}
+            label="Output tokens"
+            value={formatNumber(metrics?.tokens?.outputTokens)}
             mutedColor={mutedColor}
           />
+          {metrics?.tokens?.reasoningTokens !== undefined ? (
+            <MetricRow
+              label="Reasoning tokens"
+              value={formatNumber(metrics.tokens.reasoningTokens)}
+              mutedColor={mutedColor}
+            />
+          ) : null}
           <MetricRow
             label="Total tokens"
             value={formatNumber(metrics?.tokens?.totalTokens)}
             mutedColor={mutedColor}
           />
+          {metrics?.tokens?.sessionTokens !== undefined ? (
+            <MetricRow
+              label="Session total"
+              value={formatNumber(metrics.tokens.sessionTokens)}
+              mutedColor={mutedColor}
+            />
+          ) : null}
 
           {metrics?.tokens?.estimated === true ? (
             <Text style={[styles.footnote, { color: mutedColor }]}>

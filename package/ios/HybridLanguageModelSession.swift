@@ -7,6 +7,13 @@ private struct SessionState {
     var session: LanguageModelSession
     var isResponding = false
     var wasContextReset = false
+    var retiredSessionsUsage: NativeTokenUsage? = nil
+    var lastResponseUsage: NativeTokenUsage? = nil
+
+    mutating func retire(usageOf session: LanguageModelSession) {
+        guard let usage = session.tokenUsage else { return }
+        retiredSessionsUsage = retiredSessionsUsage.map { $0 + usage } ?? usage
+    }
 }
 
 @available(iOS 26.0, *)
@@ -64,13 +71,19 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
         guard let document = schema?.schemaDocument() else {
             guard !Self.isBlank(prompt) else { return Promise.resolved(withResult: "") }
             return generate(during: .response, options: options) { session, generationOptions in
-                try await session.respond(to: prompt, options: generationOptions).content
+                let response = try await session.respond(to: prompt, options: generationOptions, native: options)
+                return (response.content, response.tokenUsage)
             }
         }
         return generate(during: .response, options: options) { session, generationOptions in
             let generationSchema = try GenerationSchemaBuilder.responseSchema(from: document)
-            return try await session.respond(to: prompt, schema: generationSchema, options: generationOptions)
-                .content.jsonString
+            let response = try await session.respond(
+                to: prompt,
+                schema: generationSchema,
+                options: generationOptions,
+                native: options
+            )
+            return (response.content.jsonString, response.tokenUsage)
         }
     }
 
@@ -84,20 +97,18 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
         guard let document = schema?.schemaDocument() else {
             guard !Self.isBlank(prompt) else { return Promise.resolved(withResult: "") }
             return generate(during: .streaming, options: options) { session, generationOptions in
-                try await consumeStreamingResponse(
-                    session.streamResponse(to: prompt, options: generationOptions),
-                    content: { $0.content },
-                    onContent: onStream
-                )
+                let last = try await consumeStreamingResponse(
+                    session.streamResponse(to: prompt, options: generationOptions, native: options)
+                ) { onStream($0.content) }
+                return (last?.content ?? "", last?.tokenUsage)
             }
         }
         return generate(during: .streaming, options: options) { session, generationOptions in
             let generationSchema = try GenerationSchemaBuilder.responseSchema(from: document)
-            return try await consumeStreamingResponse(
-                session.streamResponse(to: prompt, schema: generationSchema, options: generationOptions),
-                content: { $0.content.jsonString },
-                onContent: onStream
-            )
+            let last = try await consumeStreamingResponse(
+                session.streamResponse(to: prompt, schema: generationSchema, options: generationOptions, native: options)
+            ) { onStream($0.content.jsonString) }
+            return (last?.content.jsonString ?? "", last?.tokenUsage)
         }
     }
 
@@ -105,7 +116,7 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
     private func generate(
         during operation: GenerationOperation,
         options: NativeGenerationOptions?,
-        _ request: @escaping (LanguageModelSession, GenerationOptions) async throws -> String
+        _ request: @escaping (LanguageModelSession, GenerationOptions) async throws -> (String, NativeTokenUsage?)
     ) -> Promise<String> {
         return Promise.async {
             let generationOptions = try GenerationOptions(options)
@@ -114,7 +125,9 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
             defer { self.endResponse() }
 
             do {
-                return try await request(modelSession, generationOptions)
+                let (content, usage) = try await request(modelSession, generationOptions)
+                self.state.withLock { $0.lastResponseUsage = usage }
+                return content
             } catch {
                 throw try await self.failure(from: error, during: operation, in: modelSession)
             }
@@ -128,6 +141,19 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
     @available(iOS 26.0, *)
     var wasContextReset: Bool {
         state.withLock { $0.wasContextReset }
+    }
+
+    @available(iOS 26.0, *)
+    var usage: NativeTokenUsage? {
+        state.withLock { state in
+            guard let current = state.session.tokenUsage else { return nil }
+            return state.retiredSessionsUsage.map { $0 + current } ?? current
+        }
+    }
+
+    @available(iOS 26.0, *)
+    var lastResponseUsage: NativeTokenUsage? {
+        state.withLock { $0.lastResponseUsage }
     }
 
     @available(iOS 26.0, *)
@@ -162,21 +188,18 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
     }
     
     @available(iOS 26.0, *)
-    private func createNewSessionWithSummary(previousSession: LanguageModelSession) async throws -> LanguageModelSession {
-        let summarySession = LanguageModelSession(model: self.model, transcript: previousSession.transcript)
-        let summaryResponse = try await summarySession.respond(to: "Summarize this conversation in a concise way that preserves the key context and information.")
-        return LanguageModelSession(
-            model: self.model,
-            tools: self.tools,
-            instructions: "\(baseInstructions)\n\nPrevious conversation summary: \(summaryResponse.content)"
-        )
-    }
-
-    @available(iOS 26.0, *)
     private func recoverFromContextOverflow(previousSession: LanguageModelSession) async throws {
         do {
-            let newSession = try await self.createNewSessionWithSummary(previousSession: previousSession)
+            let summarySession = LanguageModelSession(model: self.model, transcript: previousSession.transcript)
+            let summaryResponse = try await summarySession.respond(to: "Summarize this conversation in a concise way that preserves the key context and information.")
+            let newSession = LanguageModelSession(
+                model: self.model,
+                tools: self.tools,
+                instructions: "\(baseInstructions)\n\nPrevious conversation summary: \(summaryResponse.content)"
+            )
             state.withLock { state in
+                state.retire(usageOf: previousSession)
+                state.retire(usageOf: summarySession)
                 state.session = newSession
                 state.wasContextReset = true
             }
@@ -221,6 +244,7 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
                 throw AppleAIError.sessionBusy
             }
             state.isResponding = true
+            state.lastResponseUsage = nil
             return state.session
         }
     }

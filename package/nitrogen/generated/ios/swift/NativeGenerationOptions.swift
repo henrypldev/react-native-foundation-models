@@ -18,7 +18,7 @@ public extension NativeGenerationOptions {
   /**
    * Create a new instance of `NativeGenerationOptions`.
    */
-  init(temperature: Double?, maximumResponseTokens: Double?, samplingMode: NativeSamplingMode?, samplingTop: Double?, samplingProbabilityThreshold: Double?, samplingSeed: Double?, toolCallingMode: NativeToolCallingMode?) {
+  init(temperature: Double?, maximumResponseTokens: Double?, samplingMode: NativeSamplingMode?, samplingTop: Double?, samplingProbabilityThreshold: Double?, samplingSeed: Double?, toolCallingMode: NativeToolCallingMode?, reasoningLevel: NativeReasoningLevel?) {
     self.init({ () -> bridge.std__optional_double_ in
       if let __unwrappedValue = temperature {
         return bridge.create_std__optional_double_(__unwrappedValue)
@@ -58,6 +58,12 @@ public extension NativeGenerationOptions {
     }(), { () -> bridge.std__optional_NativeToolCallingMode_ in
       if let __unwrappedValue = toolCallingMode {
         return bridge.create_std__optional_NativeToolCallingMode_(__unwrappedValue)
+      } else {
+        return .init()
+      }
+    }(), { () -> bridge.std__optional_NativeReasoningLevel_ in
+      if let __unwrappedValue = reasoningLevel {
+        return bridge.create_std__optional_NativeReasoningLevel_(__unwrappedValue)
       } else {
         return .init()
       }
@@ -132,5 +138,10 @@ public extension NativeGenerationOptions {
   @inline(__always)
   var toolCallingMode: NativeToolCallingMode? {
     return self.__toolCallingMode.value
+  }
+  
+  @inline(__always)
+  var reasoningLevel: NativeReasoningLevel? {
+    return self.__reasoningLevel.value
   }
 }

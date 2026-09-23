@@ -24,6 +24,7 @@ import type {
   SerializedTranscript,
   SystemLanguageModelGuardrails,
   SystemLanguageModelUseCase,
+  TokenUsage,
 } from './types'
 
 const LanguageModelSessionFactory =
@@ -112,6 +113,11 @@ function parseIOSVersion(versionValue: string | number): {
   }
 }
 
+/**
+ * @deprecated Guessed from the iOS version, and returns `'26.4+'` for every
+ * iOS 27 model. On iOS 27 and later, read `variant` from
+ * `checkFoundationModelsAvailability()` instead.
+ */
 export function getFoundationModelsModelFamily():
   | FoundationModelsModelFamily
   | undefined {
@@ -164,6 +170,8 @@ export function checkFoundationModelsAvailability(): FoundationModelsAvailabilit
       message: getAvailabilityMessage(status),
       contextSize: getFoundationModelsContextSize(),
       modelFamily: getFoundationModelsModelFamily(),
+      variant: LanguageModelSessionFactory.modelVariant,
+      capabilities: LanguageModelSessionFactory.modelCapabilities,
     }
   } catch (_error) {
     return {
@@ -400,6 +408,37 @@ export class LanguageModelSession {
 
   get wasContextReset(): boolean {
     return this.session.wasContextReset
+  }
+
+  /**
+   * Tokens used by every completed request in this session. iOS 27 and later
+   * only. `undefined` on iOS 26.
+   *
+   * The count includes the summary request of a context overflow reset. A
+   * session restored from a transcript starts again from zero.
+   *
+   * @example
+   * ```typescript
+   * await session.respond('Plan a 3 day trip')
+   * session.usage?.totalTokens
+   * ```
+   */
+  get usage(): TokenUsage | undefined {
+    return this.session.usage
+  }
+
+  /**
+   * Tokens used by the latest `respond` or `streamResponse` call. iOS 27 and
+   * later only. `undefined` on iOS 26, before the first request, and after a
+   * request that failed.
+   *
+   * `inputTokens` covers the whole conversation the model read, so
+   * `inputTokens + outputTokens` is how much of the context window the
+   * session now fills. When the model calls tools, this counts only the
+   * final pass that wrote the answer. `usage` counts every pass.
+   */
+  get lastResponseUsage(): TokenUsage | undefined {
+    return this.session.lastResponseUsage
   }
 
   /**

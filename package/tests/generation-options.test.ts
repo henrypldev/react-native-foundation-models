@@ -24,12 +24,14 @@ describe('toNativeGenerationOptions', () => {
         maximumResponseTokens: 64,
         samplingMode: { kind: 'greedy' },
         toolCallingMode: 'disallowed',
+        reasoningLevel: 'deep',
       }),
     ).toEqual({
       temperature: 0.7,
       maximumResponseTokens: 64,
       samplingMode: 'greedy',
       toolCallingMode: 'disallowed',
+      reasoningLevel: 'deep',
     })
 
     expect(
@@ -118,6 +120,9 @@ describe('toNativeGenerationOptions', () => {
     ['samplingMode.seed', { samplingMode: { kind: 'randomTopK', top: 5, seed: -1 } }],
     ['samplingMode.seed', { samplingMode: { kind: 'randomTopK', top: 5, seed: 0.5 } }],
     ['toolCallingMode', { toolCallingMode: 'sometimes' }],
+    ['reasoningLevel', { reasoningLevel: 'extreme' }],
+    ['reasoningLevel', { reasoningLevel: 'toString' }],
+    ['reasoningLevel', { reasoningLevel: { custom: 'fast' } }],
   ])('rejects invalid %s: %p', (field, options) => {
     const error = rejection(options)
 
