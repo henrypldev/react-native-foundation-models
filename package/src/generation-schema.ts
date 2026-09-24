@@ -6,7 +6,7 @@ import { SchemaCreationError } from './errors'
  * A Zod object schema. Tool arguments and structured responses must use an
  * object at the root.
  */
-export type ObjectSchema = z.ZodObject<any>
+export type ObjectSchema = z.ZodObject
 
 type JsonSchema = Record<string, unknown>
 

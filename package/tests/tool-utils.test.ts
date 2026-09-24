@@ -268,7 +268,7 @@ describe('rejection keyword contract fixture', () => {
   })
 
   test('no fixture keyword is whitelisted for any type', () => {
-    const whitelisted = new Set(Object.values(KEYWORDS).flat())
+    const whitelisted = new Set<string>(Object.values(KEYWORDS).flat())
     for (const keyword of fixture) {
       expect(whitelisted.has(keyword)).toBe(false)
     }

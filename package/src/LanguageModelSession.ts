@@ -1,5 +1,5 @@
 import { Platform } from 'react-native'
-import { NitroModules } from 'react-native-nitro-modules'
+import { type AnyMap, NitroModules } from 'react-native-nitro-modules'
 import type { z } from 'zod'
 import { AppleAIError, parseNativeError } from './errors'
 import { toNativeGenerationOptions } from './generation-options'
@@ -8,6 +8,7 @@ import type {
   LanguageModelSessionConfig,
   LanguageModelSessionFactory as LanguageModelSessionFactorySpec,
   LanguageModelSession as LanguageModelSessionSpec,
+  NativeGenerationOptions,
 } from './specs/LanguageModelSession.nitro'
 import {
   type DeepPartial,
@@ -29,7 +30,35 @@ const LanguageModelSessionFactory =
     'LanguageModelSessionFactory',
   )
 
-type MaybeStructuredOptions = GenerationOptions & { schema?: ObjectSchema }
+interface ResponseRequest {
+  schema: AnyMap | undefined
+  options: NativeGenerationOptions | undefined
+  decodeChunk: (raw: string) => unknown
+  parse: (raw: string) => unknown
+}
+
+const unchanged = (raw: string) => raw
+
+function responseRequest(
+  options?: Partial<StructuredGenerationOptions<ObjectSchema>>,
+): ResponseRequest {
+  const nativeOptions = toNativeGenerationOptions(options)
+  const schema = options?.schema
+  if (!schema) {
+    return {
+      schema: undefined,
+      options: nativeOptions,
+      decodeChunk: unchanged,
+      parse: unchanged,
+    }
+  }
+  return {
+    schema: toGenerationSchema(schema, 'response'),
+    options: nativeOptions,
+    decodeChunk: parseResponseJson,
+    parse: raw => parseResponse(schema, raw),
+  }
+}
 
 export interface LanguageModelSessionOptions
   extends Omit<LanguageModelSessionConfig, 'useCase' | 'guardrails'> {
@@ -226,19 +255,15 @@ export class LanguageModelSession {
     options: StructuredGenerationOptions<S>,
   ): Promise<z.infer<S>>
   respond(prompt: string, options?: GenerationOptions): Promise<string>
-  async respond(prompt: string, options?: MaybeStructuredOptions): Promise<unknown> {
-    const schema = options?.schema
+  async respond(
+    prompt: string,
+    options?: Partial<StructuredGenerationOptions<ObjectSchema>>,
+  ): Promise<unknown> {
     try {
-      const nativeOptions = toNativeGenerationOptions(options)
-      if (!schema) {
-        return await this.session.respond(prompt, nativeOptions)
-      }
-      const json = await this.session.respondWithSchema(
-        prompt,
-        toGenerationSchema(schema, 'response'),
-        nativeOptions,
+      const request = responseRequest(options)
+      return request.parse(
+        await this.session.respond(prompt, request.schema, request.options),
       )
-      return parseResponse(schema, json)
     } catch (error) {
       throw parseNativeError(error, {
         fallbackCode: 'SESSION_RESPONSE_ERROR',
@@ -277,63 +302,59 @@ export class LanguageModelSession {
     onChunk: (chunk: string) => void,
     options?: GenerationOptions,
   ): Promise<string>
-  async streamResponse(
+  async streamResponse<Chunk>(
     prompt: string,
-    onChunk: (chunk: any) => void,
-    options?: MaybeStructuredOptions,
+    onChunk: (chunk: Chunk) => void,
+    options?: Partial<StructuredGenerationOptions<ObjectSchema>>,
   ): Promise<unknown> {
-    const schema = options?.schema
-    const decode = schema ? parseResponseJson : (chunk: string) => chunk
-    let streamFailure: AppleAIError | undefined
-
-    const safeOnChunk = (chunk: string) => {
-      if (streamFailure) {
-        return
-      }
-
-      let value: unknown
-      try {
-        value = decode(chunk)
-      } catch (error) {
-        streamFailure = parseNativeError(error)
-        return
-      }
-
-      try {
-        onChunk(value)
-      } catch (error) {
-        // Nitro dispatches void callbacks asynchronously and cannot propagate
-        // their exceptions back to this promise. Capture the first exception so
-        // it cannot escape as an uncaught native C++ runtime error.
-        const callbackCause = parseNativeError(error)
-        streamFailure = new AppleAIError(
-          'STREAM_CALLBACK_ERROR',
-          `Streaming callback failed: ${callbackCause.message}`,
-          {
-            operation: 'streamResponse.onChunk',
-            causeCode: callbackCause.code,
-          },
-          { cause: error },
-        )
-      }
-    }
-
     try {
-      const nativeOptions = toNativeGenerationOptions(options)
-      const response = schema
-        ? await this.session.streamResponseWithSchema(
-            prompt,
-            toGenerationSchema(schema, 'response'),
-            safeOnChunk,
-            nativeOptions,
+      const request = responseRequest(options)
+      let streamFailure: AppleAIError | undefined
+
+      const emit = (raw: string) => {
+        if (streamFailure) {
+          return
+        }
+
+        let chunk: Chunk
+        try {
+          chunk = request.decodeChunk(raw) as Chunk
+        } catch (error) {
+          streamFailure = parseNativeError(error)
+          return
+        }
+
+        try {
+          onChunk(chunk)
+        } catch (error) {
+          // Nitro dispatches void callbacks asynchronously and cannot propagate
+          // their exceptions back to this promise. Capture the first exception so
+          // it cannot escape as an uncaught native C++ runtime error.
+          const callbackCause = parseNativeError(error)
+          streamFailure = new AppleAIError(
+            'STREAM_CALLBACK_ERROR',
+            `Streaming callback failed: ${callbackCause.message}`,
+            {
+              operation: 'streamResponse.onChunk',
+              causeCode: callbackCause.code,
+            },
+            { cause: error },
           )
-        : await this.session.streamResponse(prompt, safeOnChunk, nativeOptions)
+        }
+      }
+
+      const response = await this.session.streamResponse(
+        prompt,
+        emit,
+        request.schema,
+        request.options,
+      )
 
       if (streamFailure) {
         throw streamFailure
       }
 
-      return schema ? parseResponse(schema, response) : response
+      return request.parse(response)
     } catch (error) {
       throw parseNativeError(error, {
         fallbackCode: 'SESSION_STREAMING_ERROR',
