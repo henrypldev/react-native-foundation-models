@@ -5,6 +5,24 @@ enum GenerationOperation: String {
     case streaming
 }
 
+extension GenerationFailureCode {
+    var summary: String {
+        switch self {
+        case .assetsUnavailable: "Model assets are unavailable"
+        case .guardrailViolation: "The request violated model guardrails"
+        case .unsupportedGuide: "The request used an unsupported generation guide"
+        case .unsupportedLanguageOrLocale: "The request used an unsupported language or locale"
+        case .unsupportedCapability: "The model does not support a capability the request needs"
+        case .unsupportedTranscriptContent: "The session transcript has content the model does not support"
+        case .decodingFailure: "The model response could not be decoded"
+        case .rateLimited: "The model rate-limited the request"
+        case .refusal: "The model refused the request"
+        case .timeout: "The request timed out"
+        case .generic: "Model generation failed"
+        }
+    }
+}
+
 @available(iOS 26.0, macOS 26.0, *)
 extension AppleAIError {
     init(generationFailure error: any Error, during operation: GenerationOperation) {
@@ -20,30 +38,51 @@ extension AppleAIError {
         }
     }
 
+    private static func failed(
+        _ code: GenerationFailureCode,
+        _ detail: String,
+        during operation: GenerationOperation
+    ) -> AppleAIError {
+        .generationError(code, message: "\(code.summary) during \(operation.rawValue): \(detail)")
+    }
+
     private static func unmapped(_ error: any Error, during operation: GenerationOperation) -> AppleAIError {
         switch operation {
-        case .response:
-            return .sessionResponseError(error)
-        case .streaming:
-            return .sessionStreamingError(error)
+        case .response: .sessionResponseError(error)
+        case .streaming: .sessionStreamingError(error)
         }
     }
 
-    private static func mappingTypedError(_ error: any Error, during operation: GenerationOperation) -> AppleAIError? {
+    private static func mapping(
+        _ error: LanguageModelSession.GenerationError,
+        during op: GenerationOperation
+    ) -> AppleAIError {
+        switch error {
+        case .exceededContextWindowSize: .contextExceeded
+        case .concurrentRequests: .sessionBusy
+        case .assetsUnavailable(let c): failed(.assetsUnavailable, c.debugDescription, during: op)
+        case .guardrailViolation(let c): failed(.guardrailViolation, c.debugDescription, during: op)
+        case .unsupportedGuide(let c): failed(.unsupportedGuide, c.debugDescription, during: op)
+        case .unsupportedLanguageOrLocale(let c): failed(.unsupportedLanguageOrLocale, c.debugDescription, during: op)
+        case .decodingFailure(let c): failed(.decodingFailure, c.debugDescription, during: op)
+        case .rateLimited(let c): failed(.rateLimited, c.debugDescription, during: op)
+        case .refusal(_, let c): failed(.refusal, c.debugDescription, during: op)
+        @unknown default: failed(.generic, error.localizedDescription, during: op)
+        }
+    }
+
+    private static func mappingTypedError(_ error: any Error, during op: GenerationOperation) -> AppleAIError? {
         #if compiler(>=6.4)
         guard #available(iOS 27.0, macOS 27.0, *) else { return nil }
         switch error {
         case let error as LanguageModelError:
-            return mapping(error, during: operation)
+            return mapping(error, during: op)
         case let error as LanguageModelSession.Error:
-            return mapping(error)
+            return mapping(error, during: op)
         case let error as SystemLanguageModel.Error:
-            return mapping(error, during: operation)
+            return mapping(error, during: op)
         case let error as GeneratedContent.ParsingError:
-            return .generationError(
-                code: "DECODING_FAILURE",
-                message: "The model response could not be parsed during \(operation.rawValue): \(error.debugDescription)"
-            )
+            return failed(.decodingFailure, error.debugDescription, during: op)
         default:
             return nil
         }
@@ -52,146 +91,36 @@ extension AppleAIError {
         #endif
     }
 
-    private static func mapping(
-        _ error: LanguageModelSession.GenerationError,
-        during operation: GenerationOperation
-    ) -> AppleAIError {
-        let operation = operation.rawValue
-        switch error {
-        case .exceededContextWindowSize:
-            return .contextExceeded
-        case .assetsUnavailable(let context):
-            return .generationError(
-                code: "ASSETS_UNAVAILABLE",
-                message: "Model assets are unavailable during \(operation): \(context.debugDescription)"
-            )
-        case .guardrailViolation(let context):
-            return .generationError(
-                code: "GUARDRAIL_VIOLATION",
-                message: "The request violated model guardrails during \(operation): \(context.debugDescription)"
-            )
-        case .unsupportedGuide(let context):
-            return .generationError(
-                code: "UNSUPPORTED_GUIDE",
-                message: "The request used an unsupported generation guide during \(operation): \(context.debugDescription)"
-            )
-        case .unsupportedLanguageOrLocale(let context):
-            return .generationError(
-                code: "UNSUPPORTED_LANGUAGE_OR_LOCALE",
-                message: "The request used an unsupported language or locale during \(operation): \(context.debugDescription)"
-            )
-        case .decodingFailure(let context):
-            return .generationError(
-                code: "DECODING_FAILURE",
-                message: "The model response could not be decoded during \(operation): \(context.debugDescription)"
-            )
-        case .rateLimited(let context):
-            return .generationError(
-                code: "RATE_LIMITED",
-                message: "The model rate-limited the \(operation) request: \(context.debugDescription)"
-            )
-        case .concurrentRequests(let context):
-            return .generationError(
-                code: "SESSION_BUSY",
-                message: "Another language model request was already in progress: \(context.debugDescription)"
-            )
-        case .refusal(_, let context):
-            return .generationError(
-                code: "REFUSAL",
-                message: "The model refused the \(operation) request: \(context.debugDescription)"
-            )
-        @unknown default:
-            return .generationError(
-                code: "GENERATION_ERROR",
-                message: "Model generation failed during \(operation): \(error.localizedDescription)"
-            )
-        }
-    }
-
     #if compiler(>=6.4)
     @available(iOS 27.0, macOS 27.0, *)
-    private static func mapping(_ error: LanguageModelError, during operation: GenerationOperation) -> AppleAIError {
-        let operation = operation.rawValue
+    private static func mapping(_ error: LanguageModelError, during op: GenerationOperation) -> AppleAIError {
         switch error {
-        case .contextSizeExceeded:
-            return .contextExceeded
-        case .rateLimited(let details):
-            return .generationError(
-                code: "RATE_LIMITED",
-                message: "The model rate-limited the \(operation) request: \(details.debugDescription)"
-            )
-        case .guardrailViolation(let details):
-            return .generationError(
-                code: "GUARDRAIL_VIOLATION",
-                message: "The request violated model guardrails during \(operation): \(details.debugDescription)"
-            )
-        case .refusal(let details):
-            return .generationError(
-                code: "REFUSAL",
-                message: "The model refused the \(operation) request: \(details.debugDescription)"
-            )
-        case .unsupportedCapability(let details):
-            return .generationError(
-                code: "UNSUPPORTED_CAPABILITY",
-                message: "The model does not support a capability the \(operation) request needs: \(details.debugDescription)"
-            )
-        case .unsupportedTranscriptContent(let details):
-            return .generationError(
-                code: "UNSUPPORTED_TRANSCRIPT_CONTENT",
-                message: "The session transcript has content the model does not support during \(operation): \(details.debugDescription)"
-            )
-        case .unsupportedGenerationGuide(let details):
-            return .generationError(
-                code: "UNSUPPORTED_GUIDE",
-                message: "The request used an unsupported generation guide during \(operation): \(details.debugDescription)"
-            )
-        case .unsupportedLanguageOrLocale(let details):
-            return .generationError(
-                code: "UNSUPPORTED_LANGUAGE_OR_LOCALE",
-                message: "The request used an unsupported language or locale during \(operation): \(details.debugDescription)"
-            )
-        case .timeout(let details):
-            return .generationError(
-                code: "TIMEOUT",
-                message: "The \(operation) request timed out: \(details.debugDescription)"
-            )
-        @unknown default:
-            return .generationError(
-                code: "GENERATION_ERROR",
-                message: "Model generation failed during \(operation): \(error.localizedDescription)"
-            )
+        case .contextSizeExceeded: .contextExceeded
+        case .rateLimited(let d): failed(.rateLimited, d.debugDescription, during: op)
+        case .guardrailViolation(let d): failed(.guardrailViolation, d.debugDescription, during: op)
+        case .refusal(let d): failed(.refusal, d.debugDescription, during: op)
+        case .unsupportedCapability(let d): failed(.unsupportedCapability, d.debugDescription, during: op)
+        case .unsupportedTranscriptContent(let d): failed(.unsupportedTranscriptContent, d.debugDescription, during: op)
+        case .unsupportedGenerationGuide(let d): failed(.unsupportedGuide, d.debugDescription, during: op)
+        case .unsupportedLanguageOrLocale(let d): failed(.unsupportedLanguageOrLocale, d.debugDescription, during: op)
+        case .timeout(let d): failed(.timeout, d.debugDescription, during: op)
+        @unknown default: failed(.generic, error.localizedDescription, during: op)
         }
     }
 
     @available(iOS 27.0, macOS 27.0, *)
-    private static func mapping(_ error: LanguageModelSession.Error) -> AppleAIError {
+    private static func mapping(_ error: LanguageModelSession.Error, during op: GenerationOperation) -> AppleAIError {
         switch error {
-        case .concurrentRequests, .transcriptMutationWhileResponding:
-            return .generationError(
-                code: "SESSION_BUSY",
-                message: "The session is busy with another request: \(error.debugDescription)"
-            )
-        @unknown default:
-            return .generationError(
-                code: "GENERATION_ERROR",
-                message: "The session rejected the request: \(error.debugDescription)"
-            )
+        case .concurrentRequests, .transcriptMutationWhileResponding: .sessionBusy
+        @unknown default: failed(.generic, error.debugDescription, during: op)
         }
     }
 
     @available(iOS 27.0, macOS 27.0, *)
-    private static func mapping(_ error: SystemLanguageModel.Error, during operation: GenerationOperation) -> AppleAIError {
+    private static func mapping(_ error: SystemLanguageModel.Error, during op: GenerationOperation) -> AppleAIError {
         switch error {
-        case .assetsUnavailable(let details):
-            return .generationError(
-                code: "ASSETS_UNAVAILABLE",
-                message: "Model assets are unavailable during \(operation.rawValue): \(details.debugDescription)"
-            )
-        @unknown default:
-            return .generationError(
-                code: "GENERATION_ERROR",
-                message: "The model failed during \(operation.rawValue): \(error.debugDescription)"
-            )
+        case .assetsUnavailable(let d): failed(.assetsUnavailable, d.debugDescription, during: op)
+        @unknown default: failed(.generic, error.debugDescription, during: op)
         }
     }
     #endif

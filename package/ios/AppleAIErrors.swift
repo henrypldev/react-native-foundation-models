@@ -12,7 +12,7 @@ public enum AppleAIError: Error, LocalizedError, CustomStringConvertible {
     case unknownToolError(String)
     case sessionStreamingError(Error)
     case sessionResponseError(Error)
-    case generationError(code: String, message: String)
+    case generationError(GenerationFailureCode, message: String)
     case contextExceeded
     case contextRecoveryFailed(Error)
     case unsupportedPlatform(String)
@@ -84,7 +84,7 @@ public enum AppleAIError: Error, LocalizedError, CustomStringConvertible {
         case .sessionResponseError:
             return "SESSION_RESPONSE_ERROR"
         case .generationError(let code, _):
-            return code
+            return code.rawValue
         case .contextExceeded:
             return "CONTEXT_EXCEEDED"
         case .contextRecoveryFailed:
@@ -97,14 +97,16 @@ public enum AppleAIError: Error, LocalizedError, CustomStringConvertible {
     }
 }
 
-public struct ErrorInfo {
-    let code: String
-    let message: String
-    let details: [String: Any]?
-    
-    init(error: AppleAIError, details: [String: Any]? = nil) {
-        self.code = error.code
-        self.message = error.errorDescription ?? "Unknown AppleAI error"
-        self.details = details
-    }
+public enum GenerationFailureCode: String {
+    case assetsUnavailable = "ASSETS_UNAVAILABLE"
+    case guardrailViolation = "GUARDRAIL_VIOLATION"
+    case unsupportedGuide = "UNSUPPORTED_GUIDE"
+    case unsupportedLanguageOrLocale = "UNSUPPORTED_LANGUAGE_OR_LOCALE"
+    case unsupportedCapability = "UNSUPPORTED_CAPABILITY"
+    case unsupportedTranscriptContent = "UNSUPPORTED_TRANSCRIPT_CONTENT"
+    case decodingFailure = "DECODING_FAILURE"
+    case rateLimited = "RATE_LIMITED"
+    case refusal = "REFUSAL"
+    case timeout = "TIMEOUT"
+    case generic = "GENERATION_ERROR"
 }
