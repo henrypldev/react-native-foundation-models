@@ -214,7 +214,25 @@ class AppleAIError extends Error {
 - `RESPONSE_PARSING_ERROR` - Failed to parse tool response
 - `UNKNOWN_TOOL_ERROR` - Unknown tool referenced
 - `SESSION_STREAMING_ERROR` - Streaming failed
+- `SESSION_RESPONSE_ERROR` - Response failed for a reason with no specific code
+- `SESSION_BUSY` - Another request is in progress on this session
+- `MODEL_UNAVAILABLE` - Apple Intelligence is not available on this device
 - `UNSUPPORTED_PLATFORM` - Platform not supported
+- `CONTEXT_EXCEEDED` - The conversation exceeded the context window. The session was recreated with a summary; retry the request
+- `CONTEXT_RECOVERY_FAILED` - The context window was exceeded and the session could not be recreated
+- `GUARDRAIL_VIOLATION` - The prompt or response violated the model guardrails
+- `REFUSAL` - The model refused the request
+- `RATE_LIMITED` - The model rate-limited the request
+- `ASSETS_UNAVAILABLE` - Model assets are not available
+- `DECODING_FAILURE` - The model response could not be decoded
+- `UNSUPPORTED_GUIDE` - The request used an unsupported generation guide
+- `UNSUPPORTED_LANGUAGE_OR_LOCALE` - The request used an unsupported language or locale
+- `UNSUPPORTED_CAPABILITY` - The model does not support a capability the request needs (iOS 27+)
+- `UNSUPPORTED_TRANSCRIPT_CONTENT` - The session transcript has content the model does not support (iOS 27+)
+- `TIMEOUT` - The request timed out (iOS 27+)
+- `TOKEN_COUNT_ERROR` - Token counting failed
+
+The same failure has the same code on iOS 26 and iOS 27.
 
 ### `StreamingOptions`
 
