@@ -38,6 +38,16 @@ export default function RootLayout() {
             <NativeTabs.Trigger.Label>Structured</NativeTabs.Trigger.Label>
           </NativeTabs.Trigger>
 
+          <NativeTabs.Trigger name="options-demo">
+            <NativeTabs.Trigger.Icon sf="slider.horizontal.3" />
+            <NativeTabs.Trigger.Label>Options</NativeTabs.Trigger.Label>
+          </NativeTabs.Trigger>
+
+          <NativeTabs.Trigger name="transcript-demo">
+            <NativeTabs.Trigger.Icon sf="doc.text" />
+            <NativeTabs.Trigger.Label>Transcript</NativeTabs.Trigger.Label>
+          </NativeTabs.Trigger>
+
           <NativeTabs.Trigger name="+not-found" hidden />
         </NativeTabs>
       </ThemeProvider>

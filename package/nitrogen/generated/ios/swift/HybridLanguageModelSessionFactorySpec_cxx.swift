@@ -147,6 +147,38 @@ open class HybridLanguageModelSessionFactorySpec_cxx {
       }()
     }
   }
+  
+  public final var modelVariant: bridge.std__optional_std__string_ {
+    @inline(__always)
+    get {
+      return { () -> bridge.std__optional_std__string_ in
+        if let __unwrappedValue = self.__implementation.modelVariant {
+          return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
+        } else {
+          return .init()
+        }
+      }()
+    }
+  }
+  
+  public final var modelCapabilities: bridge.std__optional_std__vector_NativeModelCapability__ {
+    @inline(__always)
+    get {
+      return { () -> bridge.std__optional_std__vector_NativeModelCapability__ in
+        if let __unwrappedValue = self.__implementation.modelCapabilities {
+          return bridge.create_std__optional_std__vector_NativeModelCapability__({ () -> bridge.std__vector_NativeModelCapability_ in
+            var __vector = bridge.create_std__vector_NativeModelCapability_(__unwrappedValue.count)
+            for __item in __unwrappedValue {
+              __vector.push_back(__item)
+            }
+            return __vector
+          }())
+        } else {
+          return .init()
+        }
+      }()
+    }
+  }
 
   // Methods
   @inline(__always)

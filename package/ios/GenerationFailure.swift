@@ -38,7 +38,7 @@ extension AppleAIError {
         }
     }
 
-    private static func failed(
+    static func failed(
         _ code: GenerationFailureCode,
         _ detail: String,
         during operation: GenerationOperation
@@ -70,58 +70,4 @@ extension AppleAIError {
         @unknown default: failed(.generic, error.localizedDescription, during: op)
         }
     }
-
-    private static func mappingTypedError(_ error: any Error, during op: GenerationOperation) -> AppleAIError? {
-        #if compiler(>=6.4)
-        guard #available(iOS 27.0, macOS 27.0, *) else { return nil }
-        switch error {
-        case let error as LanguageModelError:
-            return mapping(error, during: op)
-        case let error as LanguageModelSession.Error:
-            return mapping(error, during: op)
-        case let error as SystemLanguageModel.Error:
-            return mapping(error, during: op)
-        case let error as GeneratedContent.ParsingError:
-            return failed(.decodingFailure, error.debugDescription, during: op)
-        default:
-            return nil
-        }
-        #else
-        return nil
-        #endif
-    }
-
-    #if compiler(>=6.4)
-    @available(iOS 27.0, macOS 27.0, *)
-    private static func mapping(_ error: LanguageModelError, during op: GenerationOperation) -> AppleAIError {
-        switch error {
-        case .contextSizeExceeded: .contextExceeded
-        case .rateLimited(let d): failed(.rateLimited, d.debugDescription, during: op)
-        case .guardrailViolation(let d): failed(.guardrailViolation, d.debugDescription, during: op)
-        case .refusal(let d): failed(.refusal, d.debugDescription, during: op)
-        case .unsupportedCapability(let d): failed(.unsupportedCapability, d.debugDescription, during: op)
-        case .unsupportedTranscriptContent(let d): failed(.unsupportedTranscriptContent, d.debugDescription, during: op)
-        case .unsupportedGenerationGuide(let d): failed(.unsupportedGuide, d.debugDescription, during: op)
-        case .unsupportedLanguageOrLocale(let d): failed(.unsupportedLanguageOrLocale, d.debugDescription, during: op)
-        case .timeout(let d): failed(.timeout, d.debugDescription, during: op)
-        @unknown default: failed(.generic, error.localizedDescription, during: op)
-        }
-    }
-
-    @available(iOS 27.0, macOS 27.0, *)
-    private static func mapping(_ error: LanguageModelSession.Error, during op: GenerationOperation) -> AppleAIError {
-        switch error {
-        case .concurrentRequests, .transcriptMutationWhileResponding: .sessionBusy
-        @unknown default: failed(.generic, error.debugDescription, during: op)
-        }
-    }
-
-    @available(iOS 27.0, macOS 27.0, *)
-    private static func mapping(_ error: SystemLanguageModel.Error, during op: GenerationOperation) -> AppleAIError {
-        switch error {
-        case .assetsUnavailable(let d): failed(.assetsUnavailable, d.debugDescription, during: op)
-        @unknown default: failed(.generic, error.debugDescription, during: op)
-        }
-    }
-    #endif
 }

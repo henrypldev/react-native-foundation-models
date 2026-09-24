@@ -12,20 +12,26 @@
 // Forward declaration of `HybridLanguageModelSessionSpec_cxx` to properly resolve imports.
 namespace RNFoundationModels { class HybridLanguageModelSessionSpec_cxx; }
 
+// Forward declaration of `NativeTokenUsage` to properly resolve imports.
+namespace margelo::nitro::rnfoundationmodels { struct NativeTokenUsage; }
 // Forward declaration of `NativeGenerationOptions` to properly resolve imports.
 namespace margelo::nitro::rnfoundationmodels { struct NativeGenerationOptions; }
 // Forward declaration of `NativeSamplingMode` to properly resolve imports.
 namespace margelo::nitro::rnfoundationmodels { enum class NativeSamplingMode; }
 // Forward declaration of `NativeToolCallingMode` to properly resolve imports.
 namespace margelo::nitro::rnfoundationmodels { enum class NativeToolCallingMode; }
+// Forward declaration of `NativeReasoningLevel` to properly resolve imports.
+namespace margelo::nitro::rnfoundationmodels { enum class NativeReasoningLevel; }
 
+#include "NativeTokenUsage.hpp"
+#include <optional>
 #include <string>
 #include <NitroModules/Promise.hpp>
 #include <NitroModules/AnyMap.hpp>
-#include <optional>
 #include "NativeGenerationOptions.hpp"
 #include "NativeSamplingMode.hpp"
 #include "NativeToolCallingMode.hpp"
+#include "NativeReasoningLevel.hpp"
 #include <functional>
 
 #include "RNFoundationModels-Swift-Cxx-Umbrella.hpp"
@@ -76,6 +82,14 @@ namespace margelo::nitro::rnfoundationmodels {
     // Properties
     inline bool getWasContextReset() noexcept override {
       return _swiftPart.getWasContextReset();
+    }
+    inline std::optional<NativeTokenUsage> getUsage() noexcept override {
+      auto __result = _swiftPart.getUsage();
+      return __result;
+    }
+    inline std::optional<NativeTokenUsage> getLastResponseUsage() noexcept override {
+      auto __result = _swiftPart.getLastResponseUsage();
+      return __result;
     }
 
   public:

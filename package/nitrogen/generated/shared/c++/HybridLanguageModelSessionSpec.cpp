@@ -15,6 +15,8 @@ namespace margelo::nitro::rnfoundationmodels {
     // load custom methods/properties
     registerHybrids(this, [](Prototype& prototype) {
       prototype.registerHybridGetter("wasContextReset", &HybridLanguageModelSessionSpec::getWasContextReset);
+      prototype.registerHybridGetter("usage", &HybridLanguageModelSessionSpec::getUsage);
+      prototype.registerHybridGetter("lastResponseUsage", &HybridLanguageModelSessionSpec::getLastResponseUsage);
       prototype.registerHybridMethod("respond", &HybridLanguageModelSessionSpec::respond);
       prototype.registerHybridMethod("streamResponse", &HybridLanguageModelSessionSpec::streamResponse);
       prototype.registerHybridMethod("tokenCount", &HybridLanguageModelSessionSpec::tokenCount);

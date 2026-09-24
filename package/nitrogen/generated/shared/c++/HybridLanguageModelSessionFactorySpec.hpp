@@ -13,6 +13,8 @@
 #error NitroModules cannot be found! Are you sure you installed NitroModules properly?
 #endif
 
+// Forward declaration of `NativeModelCapability` to properly resolve imports.
+namespace margelo::nitro::rnfoundationmodels { enum class NativeModelCapability; }
 // Forward declaration of `HybridLanguageModelSessionSpec` to properly resolve imports.
 namespace margelo::nitro::rnfoundationmodels { class HybridLanguageModelSessionSpec; }
 // Forward declaration of `LanguageModelSessionConfig` to properly resolve imports.
@@ -20,6 +22,8 @@ namespace margelo::nitro::rnfoundationmodels { struct LanguageModelSessionConfig
 
 #include <string>
 #include <optional>
+#include "NativeModelCapability.hpp"
+#include <vector>
 #include <memory>
 #include "HybridLanguageModelSessionSpec.hpp"
 #include "LanguageModelSessionConfig.hpp"
@@ -54,6 +58,8 @@ namespace margelo::nitro::rnfoundationmodels {
       virtual bool getIsAvailable() = 0;
       virtual std::string getAvailabilityStatus() = 0;
       virtual std::optional<double> getContextSize() = 0;
+      virtual std::optional<std::string> getModelVariant() = 0;
+      virtual std::optional<std::vector<NativeModelCapability>> getModelCapabilities() = 0;
 
     public:
       // Methods

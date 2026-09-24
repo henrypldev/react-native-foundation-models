@@ -1,19 +1,17 @@
 import Foundation
 
-/// Consumes a response stream exactly once while retaining its latest snapshot.
 /// Foundation Models snapshots contain the complete partially generated response,
-/// so the final snapshot is also the completed response.
+/// so the last snapshot is also the completed response.
 func consumeStreamingResponse<Stream: AsyncSequence>(
     _ stream: Stream,
-    content: (Stream.Element) -> String,
-    onContent: (String) -> Void
-) async throws -> String {
-    var finalContent = ""
+    onSnapshot: (Stream.Element) -> Void
+) async throws -> Stream.Element? {
+    var last: Stream.Element?
 
     for try await snapshot in stream {
-        finalContent = content(snapshot)
-        onContent(finalContent)
+        last = snapshot
+        onSnapshot(snapshot)
     }
 
-    return finalContent
+    return last
 }

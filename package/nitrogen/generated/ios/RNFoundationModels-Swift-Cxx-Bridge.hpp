@@ -14,8 +14,14 @@ namespace margelo::nitro::rnfoundationmodels { class HybridLanguageModelSessionF
 namespace margelo::nitro::rnfoundationmodels { class HybridLanguageModelSessionSpec; }
 // Forward declaration of `NativeGenerationOptions` to properly resolve imports.
 namespace margelo::nitro::rnfoundationmodels { struct NativeGenerationOptions; }
+// Forward declaration of `NativeModelCapability` to properly resolve imports.
+namespace margelo::nitro::rnfoundationmodels { enum class NativeModelCapability; }
+// Forward declaration of `NativeReasoningLevel` to properly resolve imports.
+namespace margelo::nitro::rnfoundationmodels { enum class NativeReasoningLevel; }
 // Forward declaration of `NativeSamplingMode` to properly resolve imports.
 namespace margelo::nitro::rnfoundationmodels { enum class NativeSamplingMode; }
+// Forward declaration of `NativeTokenUsage` to properly resolve imports.
+namespace margelo::nitro::rnfoundationmodels { struct NativeTokenUsage; }
 // Forward declaration of `NativeToolCallingMode` to properly resolve imports.
 namespace margelo::nitro::rnfoundationmodels { enum class NativeToolCallingMode; }
 // Forward declaration of `ToolDefinition` to properly resolve imports.
@@ -31,7 +37,10 @@ namespace RNFoundationModels { class HybridLanguageModelSessionSpec_cxx; }
 #include "HybridLanguageModelSessionFactorySpec.hpp"
 #include "HybridLanguageModelSessionSpec.hpp"
 #include "NativeGenerationOptions.hpp"
+#include "NativeModelCapability.hpp"
+#include "NativeReasoningLevel.hpp"
 #include "NativeSamplingMode.hpp"
+#include "NativeTokenUsage.hpp"
 #include "NativeToolCallingMode.hpp"
 #include "ToolDefinition.hpp"
 #include <NitroModules/AnyMap.hpp>
@@ -167,6 +176,21 @@ namespace margelo::nitro::rnfoundationmodels::bridge::swift {
     return optional.value();
   }
   
+  // pragma MARK: std::optional<NativeReasoningLevel>
+  /**
+   * Specialized version of `std::optional<NativeReasoningLevel>`.
+   */
+  using std__optional_NativeReasoningLevel_ = std::optional<NativeReasoningLevel>;
+  inline std::optional<NativeReasoningLevel> create_std__optional_NativeReasoningLevel_(const NativeReasoningLevel& value) noexcept {
+    return std::optional<NativeReasoningLevel>(value);
+  }
+  inline bool has_value_std__optional_NativeReasoningLevel_(const std::optional<NativeReasoningLevel>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline NativeReasoningLevel get_std__optional_NativeReasoningLevel_(const std::optional<NativeReasoningLevel>& optional) noexcept {
+    return optional.value();
+  }
+  
   // pragma MARK: std::optional<NativeGenerationOptions>
   /**
    * Specialized version of `std::optional<NativeGenerationOptions>`.
@@ -228,6 +252,21 @@ namespace margelo::nitro::rnfoundationmodels::bridge::swift {
     return optional.has_value();
   }
   inline std::string get_std__optional_std__string_(const std::optional<std::string>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::optional<NativeTokenUsage>
+  /**
+   * Specialized version of `std::optional<NativeTokenUsage>`.
+   */
+  using std__optional_NativeTokenUsage_ = std::optional<NativeTokenUsage>;
+  inline std::optional<NativeTokenUsage> create_std__optional_NativeTokenUsage_(const NativeTokenUsage& value) noexcept {
+    return std::optional<NativeTokenUsage>(value);
+  }
+  inline bool has_value_std__optional_NativeTokenUsage_(const std::optional<NativeTokenUsage>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline NativeTokenUsage get_std__optional_NativeTokenUsage_(const std::optional<NativeTokenUsage>& optional) noexcept {
     return optional.value();
   }
   
@@ -393,6 +432,32 @@ namespace margelo::nitro::rnfoundationmodels::bridge::swift {
     return optional.has_value();
   }
   inline std::vector<ToolDefinition> get_std__optional_std__vector_ToolDefinition__(const std::optional<std::vector<ToolDefinition>>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::vector<NativeModelCapability>
+  /**
+   * Specialized version of `std::vector<NativeModelCapability>`.
+   */
+  using std__vector_NativeModelCapability_ = std::vector<NativeModelCapability>;
+  inline std::vector<NativeModelCapability> create_std__vector_NativeModelCapability_(size_t size) noexcept {
+    std::vector<NativeModelCapability> vector;
+    vector.reserve(size);
+    return vector;
+  }
+  
+  // pragma MARK: std::optional<std::vector<NativeModelCapability>>
+  /**
+   * Specialized version of `std::optional<std::vector<NativeModelCapability>>`.
+   */
+  using std__optional_std__vector_NativeModelCapability__ = std::optional<std::vector<NativeModelCapability>>;
+  inline std::optional<std::vector<NativeModelCapability>> create_std__optional_std__vector_NativeModelCapability__(const std::vector<NativeModelCapability>& value) noexcept {
+    return std::optional<std::vector<NativeModelCapability>>(value);
+  }
+  inline bool has_value_std__optional_std__vector_NativeModelCapability__(const std::optional<std::vector<NativeModelCapability>>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline std::vector<NativeModelCapability> get_std__optional_std__vector_NativeModelCapability__(const std::optional<std::vector<NativeModelCapability>>& optional) noexcept {
     return optional.value();
   }
   

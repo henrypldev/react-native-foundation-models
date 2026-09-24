@@ -19,6 +19,22 @@ export type NativeSamplingMode = 'greedy' | 'randomTopK' | 'randomProbabilityThr
 
 export type NativeToolCallingMode = 'allowed' | 'required' | 'disallowed'
 
+export type NativeReasoningLevel = 'light' | 'moderate' | 'deep'
+
+export type NativeModelCapability =
+  | 'vision'
+  | 'guidedGeneration'
+  | 'reasoning'
+  | 'toolCalling'
+
+export interface NativeTokenUsage {
+  inputTokens: number
+  cachedInputTokens: number
+  outputTokens: number
+  reasoningTokens: number
+  totalTokens: number
+}
+
 export interface NativeGenerationOptions {
   temperature?: number
   maximumResponseTokens?: number
@@ -27,6 +43,7 @@ export interface NativeGenerationOptions {
   samplingProbabilityThreshold?: number
   samplingSeed?: number
   toolCallingMode?: NativeToolCallingMode
+  reasoningLevel?: NativeReasoningLevel
 }
 
 export interface LanguageModelSession extends HybridObject<{ ios: 'swift' }> {
@@ -45,6 +62,8 @@ export interface LanguageModelSession extends HybridObject<{ ios: 'swift' }> {
   serializeTranscript(): string
   prewarm(promptPrefix?: string): void
   readonly wasContextReset: boolean
+  readonly usage?: NativeTokenUsage
+  readonly lastResponseUsage?: NativeTokenUsage
 }
 
 export interface LanguageModelSessionFactory extends HybridObject<{ ios: 'swift' }> {
@@ -52,4 +71,6 @@ export interface LanguageModelSessionFactory extends HybridObject<{ ios: 'swift'
   readonly isAvailable: boolean
   readonly availabilityStatus: string
   readonly contextSize?: number
+  readonly modelVariant?: string
+  readonly modelCapabilities?: Array<NativeModelCapability>
 }

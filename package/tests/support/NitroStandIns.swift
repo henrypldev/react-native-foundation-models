@@ -10,6 +10,12 @@ enum NativeToolCallingMode {
     case disallowed
 }
 
+enum NativeReasoningLevel {
+    case light
+    case moderate
+    case deep
+}
+
 struct NativeGenerationOptions {
     var temperature: Double? = nil
     var maximumResponseTokens: Double? = nil
@@ -18,4 +24,20 @@ struct NativeGenerationOptions {
     var samplingProbabilityThreshold: Double? = nil
     var samplingSeed: Double? = nil
     var toolCallingMode: NativeToolCallingMode? = nil
+    var reasoningLevel: NativeReasoningLevel? = nil
+}
+
+struct NativeTokenUsage {
+    var inputTokens: Double
+    var cachedInputTokens: Double
+    var outputTokens: Double
+    var reasoningTokens: Double
+    var totalTokens: Double
+}
+
+enum NativeModelCapability {
+    case vision
+    case guidedgeneration
+    case reasoning
+    case toolcalling
 }

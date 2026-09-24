@@ -46,13 +46,16 @@ const weatherTool = createTool({
   },
 })
 
-const session = new LanguageModelSession({
-  instructions: 'You are a helpful assistant',
-  tools: [weatherTool],
-})
 const contextSize = getFoundationModelsContextSize()
 
 export default function StreamingDemoScreen() {
+  const [session] = useState(
+    () =>
+      new LanguageModelSession({
+        instructions: 'You are a helpful assistant',
+        tools: [weatherTool],
+      }),
+  )
   const [tokenMetrics, setTokenMetrics] = useState<TokenMetrics>()
   const [contextReset, setContextReset] = useState(false)
   const { response, isStreaming, error, streamResponse, reset } =
@@ -67,7 +70,7 @@ export default function StreamingDemoScreen() {
       setTokenMetrics(await getTokenMetrics(session, prompt, fullResponse))
       setContextReset(session.wasContextReset)
     },
-    [streamResponse],
+    [session, streamResponse],
   )
 
   const handleReset = useCallback(() => {
