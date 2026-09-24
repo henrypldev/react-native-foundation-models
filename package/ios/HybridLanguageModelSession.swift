@@ -1,15 +1,20 @@
 import NitroModules
 import FoundationModels
+import Synchronization
+
+@available(iOS 26.0, *)
+private struct SessionState {
+    var session: LanguageModelSession
+    var isResponding = false
+    var wasContextReset = false
+}
 
 @available(iOS 26.0, *)
 class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
-    private var session: LanguageModelSession? = nil
-    private var isResponding: Bool = false
-    private var tools: [any Tool] = []
+    private let state: Mutex<SessionState>
+    private let tools: [any Tool]
     private let baseInstructions: String
-    private var contextWasReset: Bool = false
     private let model: SystemLanguageModel
-    private let stateLock = NSLock()
     
     /**
      * Initializes the wrapper with a FoundationModels session configured
@@ -40,9 +45,6 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
         let session: LanguageModelSession
         let baseInstructions: String
         if let transcript = config.transcript {
-            guard config.instructions == nil else {
-                throw AppleAIError.invalidTranscript("a transcript cannot be combined with instructions")
-            }
             let decoded = try TranscriptCoding.decode(transcript)
             session = LanguageModelSession(model: model, tools: tools, transcript: decoded)
             baseInstructions = TranscriptCoding.instructionsText(in: decoded)
@@ -52,7 +54,7 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
             session = LanguageModelSession(model: model, tools: tools, instructions: baseInstructions)
         }
         self.model = model
-        self.session = session
+        self.state = Mutex(SessionState(session: session))
         self.tools = tools
         self.baseInstructions = baseInstructions
     }
@@ -106,13 +108,9 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
         _ request: @escaping (LanguageModelSession, GenerationOptions) async throws -> String
     ) -> Promise<String> {
         return Promise.async {
-            guard let modelSession = self.session else {
-                throw AppleAIError.sessionNotInitialized
-            }
-
             let generationOptions = try GenerationOptions(options)
             try self.ensureModelIsAvailable()
-            try self.beginResponse(using: modelSession)
+            let modelSession = try self.beginResponse()
             defer { self.endResponse() }
 
             do {
@@ -129,23 +127,17 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
 
     @available(iOS 26.0, *)
     var wasContextReset: Bool {
-        return contextWasReset
+        state.withLock { $0.wasContextReset }
     }
 
     @available(iOS 26.0, *)
     func serializeTranscript() throws -> String {
-        guard let session = self.session else {
-            throw AppleAIError.sessionNotInitialized
-        }
-        return try TranscriptCoding.encode(session.transcript)
+        try TranscriptCoding.encode(state.withLock { $0.session.transcript })
     }
 
     @available(iOS 26.0, *)
     func prewarm(promptPrefix: String?) throws {
-        guard let session = self.session else {
-            throw AppleAIError.sessionNotInitialized
-        }
-        session.prewarm(promptPrefix: promptPrefix.map { Prompt($0) })
+        state.withLock { $0.session }.prewarm(promptPrefix: promptPrefix.map { Prompt($0) })
     }
 
     /**
@@ -184,8 +176,10 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
     private func recoverFromContextOverflow(previousSession: LanguageModelSession) async throws {
         do {
             let newSession = try await self.createNewSessionWithSummary(previousSession: previousSession)
-            self.session = newSession
-            self.contextWasReset = true
+            state.withLock { state in
+                state.session = newSession
+                state.wasContextReset = true
+            }
         } catch {
             throw AppleAIError.contextRecoveryFailed(error)
         }
@@ -221,21 +215,19 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
     }
 
     @available(iOS 26.0, *)
-    private func beginResponse(using modelSession: LanguageModelSession) throws {
-        stateLock.lock()
-        defer { stateLock.unlock() }
-
-        guard !isResponding && !modelSession.isResponding else {
-            throw AppleAIError.sessionBusy
+    private func beginResponse() throws -> LanguageModelSession {
+        try state.withLock { state in
+            guard !state.isResponding && !state.session.isResponding else {
+                throw AppleAIError.sessionBusy
+            }
+            state.isResponding = true
+            return state.session
         }
-
-        isResponding = true
     }
 
+    @available(iOS 26.0, *)
     private func endResponse() {
-        stateLock.lock()
-        isResponding = false
-        stateLock.unlock()
+        state.withLock { $0.isResponding = false }
     }
 
     @available(iOS 26.0, *)
