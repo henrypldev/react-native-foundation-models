@@ -34,3 +34,10 @@ struct NativeTokenUsage {
     var reasoningTokens: Double
     var totalTokens: Double
 }
+
+enum NativeModelCapability {
+    case vision
+    case guidedgeneration
+    case reasoning
+    case toolcalling
+}
