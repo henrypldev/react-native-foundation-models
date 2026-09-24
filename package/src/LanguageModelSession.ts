@@ -76,26 +76,19 @@ export type LanguageModelSessionOptions = {
   | { transcript: SerializedTranscript; instructions?: never }
 )
 
-/**
- * Gets a human-readable message for the availability status
- */
-function getAvailabilityMessage(status: AvailabilityStatus): string {
-  switch (status) {
-    case 'available':
-      return 'Foundation Models is available and ready to use'
-    case 'unavailable.platformNotSupported':
-      return 'Foundation Models requires iOS 26.0 or later'
-    case 'unavailable.deviceNotEligible':
-      return 'This device does not support Apple Intelligence'
-    case 'unavailable.appleIntelligenceNotEnabled':
-      return 'Apple Intelligence is not enabled in Settings'
-    case 'unavailable.modelNotReady':
-      return 'The model is downloading or not ready for other system reasons'
-    case 'unavailable.unknown':
-      return 'Foundation Models is unavailable for an unknown reason'
-    default:
-      return 'Foundation Models availability status is unknown'
-  }
+const availabilityMessages: Record<AvailabilityStatus, string> = {
+  available: 'Foundation Models is available and ready to use',
+  'unavailable.platformNotSupported': 'Foundation Models requires iOS 26.0 or later',
+  'unavailable.deviceNotEligible': 'This device does not support Apple Intelligence',
+  'unavailable.appleIntelligenceNotEnabled':
+    'Apple Intelligence is not enabled in Settings',
+  'unavailable.modelNotReady':
+    'The model is downloading or not ready for other system reasons',
+  'unavailable.unknown': 'Foundation Models is unavailable for an unknown reason',
+}
+
+function isAvailabilityStatus(value: string): value is AvailabilityStatus {
+  return Object.hasOwn(availabilityMessages, value)
 }
 
 function parseIOSVersion(versionValue: string | number): {
@@ -159,15 +152,15 @@ export function getFoundationModelsContextSize(): number | undefined {
 export function checkFoundationModelsAvailability(): FoundationModelsAvailability {
   try {
     const isAvailable = LanguageModelSessionFactory.isAvailable
-    const statusString = LanguageModelSessionFactory.availabilityStatus
-    const status = statusString.startsWith('unavailable.unknown(')
-      ? ('unavailable.unknown' as const)
-      : (statusString as AvailabilityStatus)
+    const nativeStatus = LanguageModelSessionFactory.availabilityStatus
+    const status = isAvailabilityStatus(nativeStatus)
+      ? nativeStatus
+      : 'unavailable.unknown'
 
     return {
       isAvailable,
       status,
-      message: getAvailabilityMessage(status),
+      message: availabilityMessages[status],
       contextSize: getFoundationModelsContextSize(),
       modelFamily: getFoundationModelsModelFamily(),
       variant: LanguageModelSessionFactory.modelVariant,
@@ -177,7 +170,7 @@ export function checkFoundationModelsAvailability(): FoundationModelsAvailabilit
     return {
       isAvailable: false,
       status: 'unavailable.platformNotSupported',
-      message: getAvailabilityMessage('unavailable.platformNotSupported'),
+      message: availabilityMessages['unavailable.platformNotSupported'],
       contextSize: getFoundationModelsContextSize(),
       modelFamily: getFoundationModelsModelFamily(),
     }
@@ -484,7 +477,10 @@ export class LanguageModelSession {
     try {
       this.session.prewarm(promptPrefix)
     } catch (error) {
-      throw parseNativeError(error, { operation: 'prewarm' })
+      throw parseNativeError(error, {
+        fallbackCode: 'PREWARM_ERROR',
+        operation: 'prewarm',
+      })
     }
   }
 }

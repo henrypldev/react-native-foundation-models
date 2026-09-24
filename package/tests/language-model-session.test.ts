@@ -6,7 +6,7 @@ import type {
   LanguageModelSessionFactory,
   LanguageModelSession as LanguageModelSessionSpec,
 } from '../src/specs/LanguageModelSession.nitro'
-import type { SerializedTranscript } from '../src/types'
+import type { AvailabilityStatus, SerializedTranscript } from '../src/types'
 
 type NativeSession = Omit<LanguageModelSessionSpec, keyof HybridObject<{ ios: 'swift' }>>
 
@@ -56,8 +56,7 @@ beforeEach(() => {
     wasContextReset: false,
   }
   createSession = () => nativeSession
-  factory.modelVariant = undefined
-  factory.modelCapabilities = undefined
+  factory.availabilityStatus = 'available'
 })
 
 describe('LanguageModelSession native boundary', () => {
@@ -428,21 +427,31 @@ describe('LanguageModelSession transcript', () => {
   })
 })
 
-describe('iOS 27 model info', () => {
-  test('reports the native model variant and capabilities', () => {
-    factory.modelVariant = 'AFM 3 Core'
-    factory.modelCapabilities = ['vision', 'guidedGeneration', 'toolCalling']
+describe('LanguageModelSession prewarm', () => {
+  test('maps an opaque native prewarm failure', () => {
+    nativeSession.prewarm = () => {
+      throw new Error('Unknown native C++ error')
+    }
+    const session = new LanguageModelSession()
 
-    expect(checkFoundationModelsAvailability()).toMatchObject({
-      variant: 'AFM 3 Core',
-      capabilities: ['vision', 'guidedGeneration', 'toolCalling'],
-    })
+    expect(() => session.prewarm()).toThrow(
+      expect.objectContaining({
+        code: 'PREWARM_ERROR',
+        details: expect.objectContaining({ operation: 'prewarm' }),
+      }),
+    )
   })
+})
 
-  test('leaves model info undefined when native reports none', () => {
-    const availability = checkFoundationModelsAvailability()
+describe('checkFoundationModelsAvailability', () => {
+  test.each<[string, AvailabilityStatus]>([
+    ['available', 'available'],
+    ['unavailable.modelNotReady', 'unavailable.modelNotReady'],
+    ['unavailable.unknown(someFutureReason)', 'unavailable.unknown'],
+    ['unavailable.somethingNew', 'unavailable.unknown'],
+  ])('parses native status %s as %s', (nativeStatus, status) => {
+    factory.availabilityStatus = nativeStatus
 
-    expect(availability.variant).toBeUndefined()
-    expect(availability.capabilities).toBeUndefined()
+    expect(checkFoundationModelsAvailability().status).toBe(status)
   })
 })
