@@ -115,6 +115,8 @@ prewarm(promptPrefix?: string): void
 **Parameters**:
 - `promptPrefix?: string` - The expected start of the next prompt, when known
 
+A native failure throws `PREWARM_ERROR`.
+
 ### Instance Properties
 
 #### `wasContextReset`
@@ -145,11 +147,11 @@ readonly lastResponseUsage: TokenUsage | undefined
 
 `inputTokens` covers the whole conversation the model read for this request, including instructions and tool definitions. `inputTokens + outputTokens` is therefore how much of the context window the session fills after the request.
 
-When the model calls tools, a request has more than one model pass. `lastResponseUsage` counts only the final pass that wrote the answer, and `usage` counts every pass. On the iOS 27.0 simulator, one request with one tool call reported 356 tokens in `lastResponseUsage` and 660 in `usage`.
+When the model calls tools, a request has more than one model pass. `lastResponseUsage` counts only the final pass that wrote the answer, and `usage` counts every pass, so after a tool call `usage` grows by more than `lastResponseUsage`.
 
 ```typescript
 await session.respond('Plan a 3 day trip');
-session.lastResponseUsage; // { inputTokens: 61, cachedInputTokens: 0, outputTokens: 13, reasoningTokens: 0, totalTokens: 74 }
+session.lastResponseUsage; // { inputTokens, cachedInputTokens, outputTokens, reasoningTokens, totalTokens }
 await session.respond('Make it 2 days');
 session.usage?.totalTokens; // both requests together
 ```
@@ -333,7 +335,7 @@ type ReasoningLevel = 'light' | 'moderate' | 'deep';
 - `temperature` - A finite number of 0 or more. Lower values give more predictable output.
 - `maximumResponseTokens` - A positive integer. The response stops at this many tokens. In a session with tools, a very small value (for example 5) can reject with `DECODING_FAILURE`.
 - `samplingMode` - How the model picks each token. `greedy` always picks the most likely token. `randomTopK` samples from the `top` most likely tokens (`top` is an integer of 1 or more). `randomProbabilityThreshold` samples from the smallest set of tokens whose probabilities add up to `probabilityThreshold` (greater than 0, at most 1). `seed` is an optional non-negative integer that makes random sampling repeatable.
-- `toolCallingMode` - Whether the model may (`allowed`), must (`required`), or must not (`disallowed`) call tools. iOS 27 and later only. iOS 26 ignores it. With `required`, the model calls a tool at every step. On the iOS 27.0 simulator it kept calling the tool and the request did not end normally, so prefer `allowed` unless your tool loop has an exit.
+- `toolCallingMode` - Whether the model may (`allowed`), must (`required`), or must not (`disallowed`) call tools. iOS 27 and later only. iOS 26 ignores it. With `required`, the model calls a tool at every step, so the request can fail to end. Prefer `allowed` unless your tool loop has an exit.
 - `reasoningLevel` - How much the model reasons before it answers. iOS 27 and later only. iOS 26 ignores it. A model without the `reasoning` capability (for example `AFM 3 Core`) rejects the request with `UNSUPPORTED_CAPABILITY`. Check `checkFoundationModelsAvailability().capabilities` first.
 
 ### `StructuredGenerationOptions`
@@ -383,7 +385,7 @@ type SerializedTranscript = string & { readonly [brand]: 'SerializedTranscript' 
 
 The format belongs to Apple and carries a version (`"version":"1.1"` on iOS 27). The only promise is that a value read from `session.transcript` restores through `new LanguageModelSession({ transcript })`. Do not build or edit one by hand. A value read back from storage needs a cast: `stored as SerializedTranscript`.
 
-The decoder rejects versions, entry roles, and segment types it does not know. On iOS 27 it rejects every version other than `1.1`. A transcript that holds iOS 27-only content, such as reasoning entries or attachment segments, is therefore not expected to restore on iOS 26. Restoring on iOS 26 was not tested. Treat `INVALID_TRANSCRIPT` as a normal outcome after an OS update, and start a new session when it occurs.
+The decoder rejects versions, entry roles, and segment types it does not know. On iOS 27 it rejects every version other than `1.1`. A transcript that holds iOS 27-only content, such as reasoning entries or attachment segments, is therefore not expected to restore on iOS 26. Treat `INVALID_TRANSCRIPT` as a normal outcome after an OS update, and start a new session when it occurs.
 
 ### `ToolDefinition`
 
@@ -411,36 +413,43 @@ class AppleAIError extends Error {
 
 #### Error Codes
 
-- `SESSION_NOT_INITIALIZED` - Session is not ready
-- `TOOL_CALL_ERROR` - Tool call failed
-- `TOOL_EXECUTION_ERROR` - Tool execution failed
-- `SCHEMA_CREATION_ERROR` - A tool or response schema uses a feature the model does not support
-- `ARGUMENT_PARSING_ERROR` - Failed to parse tool arguments
-- `RESPONSE_PARSING_ERROR` - Failed to parse tool response
-- `RESPONSE_VALIDATION_ERROR` - A structured response does not match its schema. `details.issues` holds the Zod issues
-- `UNKNOWN_TOOL_ERROR` - Unknown tool referenced
-- `SESSION_STREAMING_ERROR` - Streaming failed
-- `SESSION_RESPONSE_ERROR` - Response failed for a reason with no specific code
-- `SESSION_BUSY` - Another request is in progress on this session
-- `MODEL_UNAVAILABLE` - Apple Intelligence is not available on this device
-- `UNSUPPORTED_PLATFORM` - Platform not supported
-- `CONTEXT_EXCEEDED` - The conversation exceeded the context window. The session was recreated with a summary; retry the request
-- `CONTEXT_RECOVERY_FAILED` - The context window was exceeded and the session could not be recreated
-- `GUARDRAIL_VIOLATION` - The prompt or response violated the model guardrails
-- `REFUSAL` - The model refused the request
-- `RATE_LIMITED` - The model rate-limited the request
-- `ASSETS_UNAVAILABLE` - Model assets are not available
-- `DECODING_FAILURE` - The model response could not be decoded
-- `UNSUPPORTED_GUIDE` - The request used an unsupported generation guide
-- `UNSUPPORTED_LANGUAGE_OR_LOCALE` - The request used an unsupported language or locale
-- `UNSUPPORTED_CAPABILITY` - The model does not support a capability the request needs (iOS 27+)
-- `UNSUPPORTED_TRANSCRIPT_CONTENT` - The session transcript has content the model does not support (iOS 27+)
-- `TIMEOUT` - The request timed out (iOS 27+)
-- `TOKEN_COUNT_ERROR` - Token counting failed
-- `INVALID_GENERATION_OPTIONS` - A `GenerationOptions` value is invalid. `details.field` names the field
-- `INVALID_SESSION_OPTIONS` - The session options combine `instructions` and `transcript`
-- `INVALID_TRANSCRIPT` - The `transcript` option cannot be decoded. It is not valid JSON, not a transcript, or holds a version or content this OS does not know
-- `TRANSCRIPT_ENCODING_ERROR` - `session.transcript` could not encode the conversation
+| Code | Meaning |
+| --- | --- |
+| `ARGUMENT_PARSING_ERROR` | The tool arguments from the model could not be parsed |
+| `ASSETS_UNAVAILABLE` | Model assets are not available |
+| `CONTEXT_EXCEEDED` | The conversation exceeded the context window. The session was recreated with a summary. Retry the request |
+| `CONTEXT_RECOVERY_FAILED` | The context window was exceeded and the session could not be recreated |
+| `DECODING_FAILURE` | The model response could not be decoded |
+| `GENERATION_ERROR` | The model failed with an error this library does not know yet, for example one added in a new OS version |
+| `GUARDRAIL_VIOLATION` | The prompt or response violated the model guardrails |
+| `INVALID_GENERATION_OPTIONS` | A `GenerationOptions` value is invalid. `details.field` names the field |
+| `INVALID_SESSION_OPTIONS` | The session options combine `instructions` and `transcript` |
+| `INVALID_TRANSCRIPT` | The `transcript` option cannot be decoded. It is not valid JSON, not a transcript, or holds a version or content this OS does not know |
+| `MODEL_UNAVAILABLE` | Apple Intelligence is not available on this device |
+| `PREWARM_ERROR` | `prewarm` failed |
+| `RATE_LIMITED` | The model rate-limited the request |
+| `REFUSAL` | The model refused the request |
+| `RESPONSE_PARSING_ERROR` | A tool handler returned a value that could not be converted |
+| `RESPONSE_VALIDATION_ERROR` | A structured response does not match its schema. `details.issues` holds the Zod issues |
+| `SCHEMA_CREATION_ERROR` | A tool or response schema uses a feature the model does not support |
+| `SESSION_BUSY` | Another request is in progress on this session |
+| `SESSION_INITIALIZATION_ERROR` | The native session could not be created for a reason with no specific code |
+| `SESSION_NOT_INITIALIZED` | `useLanguageModel` has no session yet |
+| `SESSION_RESPONSE_ERROR` | `respond` failed for a reason with no specific code |
+| `SESSION_STREAMING_ERROR` | `streamResponse` failed for a reason with no specific code |
+| `STREAM_CALLBACK_ERROR` | The `onChunk` callback threw. `details.causeCode` holds the code of the thrown error |
+| `TIMEOUT` | The request timed out (iOS 27+) |
+| `TOKEN_COUNT_ERROR` | Token counting failed |
+| `TOOL_CALL_ERROR` | A tool call failed |
+| `TOOL_EXECUTION_ERROR` | A tool handler threw |
+| `TRANSCRIPT_ENCODING_ERROR` | `session.transcript` could not encode the conversation |
+| `UNKNOWN_ERROR` | A failure with no code and no operation to attribute it to |
+| `UNKNOWN_TOOL_ERROR` | The model called a tool the session does not have |
+| `UNSUPPORTED_CAPABILITY` | The model does not support a capability the request needs, such as `reasoningLevel` (iOS 27+) |
+| `UNSUPPORTED_GUIDE` | The request used an unsupported generation guide |
+| `UNSUPPORTED_LANGUAGE_OR_LOCALE` | The request used an unsupported language or locale |
+| `UNSUPPORTED_PLATFORM` | The OS version does not support the call |
+| `UNSUPPORTED_TRANSCRIPT_CONTENT` | The session transcript has content the model does not support (iOS 27+) |
 
 The same failure has the same code on iOS 26 and iOS 27.
 
