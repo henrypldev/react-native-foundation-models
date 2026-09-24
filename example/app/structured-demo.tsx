@@ -1,15 +1,15 @@
 import { useCallback, useState } from 'react'
-import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity } from 'react-native'
+import { ActivityIndicator, StyleSheet, View } from 'react-native'
 import {
   type AppleAIError,
   type DeepPartial,
-  isAppleAIError,
   LanguageModelSession,
   parseNativeError,
 } from 'react-native-foundation-models'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { z } from 'zod'
-import { Text, useThemeColor, View } from '@/components/Themed'
+import { Card, CardLabel, Chip, ChipRow } from '@/components/Card'
+import { DemoScreen } from '@/components/DemoScreen'
+import { Text, useThemeColor } from '@/components/Themed'
 
 const Recipe = z.object({
   title: z.string(),
@@ -30,89 +30,78 @@ const PROMPTS = [
   'A hard French dessert',
 ]
 
-const session = new LanguageModelSession({
-  instructions: 'You write short, practical recipes.',
-})
+function describeStatus(
+  error: AppleAIError | undefined,
+  recipe: Recipe | undefined,
+  isStreaming: boolean,
+  snapshots: number,
+) {
+  if (error) return error.code
+  if (recipe) return `Validated after ${snapshots} snapshots`
+  if (isStreaming) return `Streaming, ${snapshots} snapshots`
+  return 'Pick a prompt'
+}
 
 export default function StructuredDemoScreen() {
-  const insets = useSafeAreaInsets()
   const mutedColor = useThemeColor({}, 'muted')
-  const borderColor = useThemeColor({}, 'border')
-  const cardColor = useThemeColor({}, 'card')
-  const tintColor = useThemeColor({}, 'tint')
   const dangerColor = useThemeColor({}, 'danger')
-
+  const [session] = useState(
+    () =>
+      new LanguageModelSession({ instructions: 'You write short, practical recipes.' }),
+  )
   const [partial, setPartial] = useState<DeepPartial<Recipe>>({})
   const [snapshots, setSnapshots] = useState(0)
   const [recipe, setRecipe] = useState<Recipe>()
   const [isStreaming, setIsStreaming] = useState(false)
   const [error, setError] = useState<AppleAIError>()
 
-  const generate = useCallback(async (prompt: string) => {
-    setPartial({})
-    setSnapshots(0)
-    setRecipe(undefined)
-    setError(undefined)
-    setIsStreaming(true)
-    try {
-      const result = await session.streamResponse(
-        prompt,
-        next => {
-          setPartial(next)
-          setSnapshots(count => count + 1)
-        },
-        { schema: Recipe },
-      )
-      setRecipe(result)
-    } catch (err) {
-      setError(isAppleAIError(err) ? err : parseNativeError(err))
-    } finally {
-      setIsStreaming(false)
-    }
-  }, [])
+  const generate = useCallback(
+    async (prompt: string) => {
+      setPartial({})
+      setSnapshots(0)
+      setRecipe(undefined)
+      setError(undefined)
+      setIsStreaming(true)
+      try {
+        const result = await session.streamResponse(
+          prompt,
+          next => {
+            setPartial(next)
+            setSnapshots(count => count + 1)
+          },
+          { schema: Recipe },
+        )
+        setRecipe(result)
+      } catch (err) {
+        setError(parseNativeError(err))
+      } finally {
+        setIsStreaming(false)
+      }
+    },
+    [session],
+  )
 
   const shown = recipe ?? partial
-  const status = error
-    ? error.code
-    : recipe
-      ? `Validated after ${snapshots} snapshots`
-      : isStreaming
-        ? `Streaming, ${snapshots} snapshots`
-        : 'Pick a prompt'
+  const status = describeStatus(error, recipe, isStreaming, snapshots)
 
   return (
-    <ScrollView
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]}
-      testID="structured-scroll"
-    >
-      <Text style={[styles.eyebrow, { color: mutedColor }]}>ZOD SCHEMA OUTPUT</Text>
-      <Text style={styles.title}>Structured</Text>
-
-      <View style={styles.prompts}>
+    <DemoScreen eyebrow="ZOD SCHEMA OUTPUT" title="Structured" testID="structured-scroll">
+      <ChipRow>
         {PROMPTS.map(prompt => (
-          <TouchableOpacity
+          <Chip
             key={prompt}
-            accessibilityRole="button"
+            label={prompt}
             disabled={isStreaming}
             onPress={() => generate(prompt)}
-            style={[
-              styles.chip,
-              { borderColor: tintColor, opacity: isStreaming ? 0.4 : 1 },
-            ]}
-          >
-            <Text style={{ color: tintColor }}>{prompt}</Text>
-          </TouchableOpacity>
+          />
         ))}
-      </View>
+      </ChipRow>
 
-      <View style={[styles.card, { borderColor, backgroundColor: cardColor }]}>
-        <View style={[styles.statusRow, { backgroundColor: 'transparent' }]}>
-          <Text
-            testID="structured-status"
-            style={[styles.cardLabel, { color: error ? dangerColor : mutedColor }]}
-          >
+      <Card>
+        <View style={styles.statusRow}>
+          <CardLabel testID="structured-status" style={error && { color: dangerColor }}>
             {status.toUpperCase()}
-          </Text>
+          </CardLabel>
           {isStreaming ? <ActivityIndicator size="small" /> : null}
         </View>
 
@@ -126,28 +115,26 @@ export default function StructuredDemoScreen() {
           mutedColor={mutedColor}
         />
 
-        <Text style={[styles.cardLabel, { color: mutedColor }]}>INGREDIENTS</Text>
+        <CardLabel>INGREDIENTS</CardLabel>
         <Text style={styles.list}>
           {(shown.ingredients ?? [])
             .map(({ quantity = '', name = '' }) => `• ${quantity} ${name}`.trimEnd())
             .join('\n')}
         </Text>
 
-        <Text style={[styles.cardLabel, { color: mutedColor }]}>STEPS</Text>
+        <CardLabel>STEPS</CardLabel>
         <Text style={styles.list}>
           {(shown.steps ?? []).map((step, index) => `${index + 1}. ${step}`).join('\n')}
         </Text>
-      </View>
+      </Card>
 
-      <View style={[styles.card, { borderColor, backgroundColor: cardColor }]}>
-        <Text style={[styles.cardLabel, { color: mutedColor }]}>
-          {recipe ? 'PARSED VALUE' : 'LATEST SNAPSHOT'}
-        </Text>
+      <Card>
+        <CardLabel>{recipe ? 'PARSED VALUE' : 'LATEST SNAPSHOT'}</CardLabel>
         <Text testID="structured-json" style={styles.json}>
           {JSON.stringify(shown, null, 2)}
         </Text>
-      </View>
-    </ScrollView>
+      </Card>
+    </DemoScreen>
   )
 }
 
@@ -161,7 +148,7 @@ function Field({
   mutedColor: string
 }) {
   return (
-    <View style={[styles.statusRow, { backgroundColor: 'transparent' }]}>
+    <View style={styles.statusRow}>
       <Text style={{ color: mutedColor }}>{label}</Text>
       <Text>{value || '…'}</Text>
     </View>
@@ -169,43 +156,6 @@ function Field({
 }
 
 const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: 20,
-    paddingBottom: 120,
-    gap: 16,
-  },
-  eyebrow: {
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  title: {
-    fontSize: 34,
-    fontWeight: '700',
-  },
-  prompts: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    backgroundColor: 'transparent',
-  },
-  chip: {
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  card: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 16,
-    padding: 16,
-    gap: 8,
-  },
-  cardLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
   statusRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
