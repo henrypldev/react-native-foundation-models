@@ -104,6 +104,20 @@ namespace margelo::nitro::rnfoundationmodels {
       auto __value = std::move(__result.value());
       return __value;
     }
+    inline std::string serializeTranscript() override {
+      auto __result = _swiftPart.serializeTranscript();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline void prewarm(const std::optional<std::string>& promptPrefix) override {
+      auto __result = _swiftPart.prewarm(promptPrefix);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+    }
 
   private:
     RNFoundationModels::HybridLanguageModelSessionSpec_cxx _swiftPart;

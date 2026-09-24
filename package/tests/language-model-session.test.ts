@@ -2,25 +2,27 @@ import { beforeEach, describe, expect, mock, test } from 'bun:test'
 import type { HybridObject } from 'react-native-nitro-modules'
 import { z } from 'zod'
 import type {
+  LanguageModelSessionConfig,
   LanguageModelSessionFactory,
   LanguageModelSession as LanguageModelSessionSpec,
 } from '../src/specs/LanguageModelSession.nitro'
+import type { SerializedTranscript } from '../src/types'
 
 type NativeSession = Omit<LanguageModelSessionSpec, keyof HybridObject<{ ios: 'swift' }>>
 
 let nativeSession: NativeSession
-let createSession: () => NativeSession
+let createSession: (config: LanguageModelSessionConfig) => NativeSession
 
 const factory = {
   isAvailable: true,
   availabilityStatus: 'available',
   contextSize: 4096,
-  create: () => createSession(),
+  create: (config: LanguageModelSessionConfig) => createSession(config),
 } satisfies Omit<
   LanguageModelSessionFactory,
   keyof HybridObject<{ ios: 'swift' }> | 'create'
 > & {
-  create: () => NativeSession
+  create: (config: LanguageModelSessionConfig) => NativeSession
 }
 
 mock.module('react-native-nitro-modules', () => ({
@@ -44,6 +46,8 @@ beforeEach(() => {
       return 'complete'
     },
     tokenCount: async () => 3,
+    serializeTranscript: () => '{}',
+    prewarm: () => {},
     wasContextReset: false,
   }
   createSession = () => nativeSession
@@ -361,5 +365,56 @@ describe('LanguageModelSession structured output', () => {
       session.streamResponse('A pasta recipe', onChunk, { schema: Recipe }),
     ).rejects.toMatchObject({ code: 'RESPONSE_VALIDATION_ERROR' })
     expect(onChunk).not.toHaveBeenCalled()
+  })
+})
+
+const savedTranscript = '{"version":"1.1"}' as SerializedTranscript
+
+describe('LanguageModelSession transcript', () => {
+  test('rejects instructions combined with a transcript without calling native', () => {
+    const create = mock(() => nativeSession)
+    createSession = create
+
+    expect(
+      () =>
+        new LanguageModelSession({
+          instructions: 'Be brief.',
+          transcript: savedTranscript,
+        } as never),
+    ).toThrow(
+      expect.objectContaining({
+        code: 'INVALID_SESSION_OPTIONS',
+        details: { operation: 'createSession' },
+      }),
+    )
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  test('preserves the native invalid transcript code', () => {
+    createSession = () => {
+      throw new Error("[INVALID_TRANSCRIPT] Invalid transcript: missing key 'version'")
+    }
+
+    expect(() => new LanguageModelSession({ transcript: savedTranscript })).toThrow(
+      expect.objectContaining({
+        code: 'INVALID_TRANSCRIPT',
+        message: "Invalid transcript: missing key 'version'",
+        details: expect.objectContaining({ operation: 'createSession' }),
+      }),
+    )
+  })
+
+  test('maps a native transcript encoding failure', () => {
+    nativeSession.serializeTranscript = () => {
+      throw new Error('Unknown native C++ error')
+    }
+    const session = new LanguageModelSession()
+
+    expect(() => session.transcript).toThrow(
+      expect.objectContaining({
+        code: 'TRANSCRIPT_ENCODING_ERROR',
+        details: expect.objectContaining({ operation: 'transcript' }),
+      }),
+    )
   })
 })

@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Renamed package from `react-native-apple-intelligence` to `react-native-foundation-models`.
 - `streamResponse` callback now emits chunks instead of the full response.
+- `LanguageModelSessionOptions` and `UseLanguageModelConfig` are now type aliases
+  for a union that allows `instructions` or `transcript`, not both. An
+  `interface` that `extends` either type no longer compiles. Use an
+  intersection (`type Props = LanguageModelSessionOptions & { ... }`) instead.
 
 ## [0.1.0] - 2025-09-18
 

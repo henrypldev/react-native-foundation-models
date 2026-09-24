@@ -57,6 +57,8 @@ namespace margelo::nitro::rnfoundationmodels {
       virtual std::shared_ptr<Promise<std::string>> respond(const std::string& prompt, const std::optional<std::shared_ptr<AnyMap>>& schema, const std::optional<NativeGenerationOptions>& options) = 0;
       virtual std::shared_ptr<Promise<std::string>> streamResponse(const std::string& prompt, const std::function<void(const std::string& /* stream */)>& onStream, const std::optional<std::shared_ptr<AnyMap>>& schema, const std::optional<NativeGenerationOptions>& options) = 0;
       virtual std::shared_ptr<Promise<double>> tokenCount(const std::string& prompt) = 0;
+      virtual std::string serializeTranscript() = 0;
+      virtual void prewarm(const std::optional<std::string>& promptPrefix) = 0;
 
     protected:
       // Hybrid Setup

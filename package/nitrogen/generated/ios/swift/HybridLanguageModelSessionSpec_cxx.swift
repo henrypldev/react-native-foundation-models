@@ -204,4 +204,34 @@ open class HybridLanguageModelSessionSpec_cxx {
       return bridge.create_Result_std__shared_ptr_Promise_double___(__exceptionPtr)
     }
   }
+  
+  @inline(__always)
+  public final func serializeTranscript() -> bridge.Result_std__string_ {
+    do {
+      let __result = try self.__implementation.serializeTranscript()
+      let __resultCpp = std.string(__result)
+      return bridge.create_Result_std__string_(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__string_(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func prewarm(promptPrefix: bridge.std__optional_std__string_) -> bridge.Result_void_ {
+    do {
+      try self.__implementation.prewarm(promptPrefix: { () -> String? in
+        if bridge.has_value_std__optional_std__string_(promptPrefix) {
+          let __unwrapped = bridge.get_std__optional_std__string_(promptPrefix)
+          return String(__unwrapped)
+        } else {
+          return nil
+        }
+      }())
+      return bridge.create_Result_void_()
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_void_(__exceptionPtr)
+    }
+  }
 }

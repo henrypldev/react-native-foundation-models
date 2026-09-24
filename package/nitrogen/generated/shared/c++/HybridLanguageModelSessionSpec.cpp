@@ -18,6 +18,8 @@ namespace margelo::nitro::rnfoundationmodels {
       prototype.registerHybridMethod("respond", &HybridLanguageModelSessionSpec::respond);
       prototype.registerHybridMethod("streamResponse", &HybridLanguageModelSessionSpec::streamResponse);
       prototype.registerHybridMethod("tokenCount", &HybridLanguageModelSessionSpec::tokenCount);
+      prototype.registerHybridMethod("serializeTranscript", &HybridLanguageModelSessionSpec::serializeTranscript);
+      prototype.registerHybridMethod("prewarm", &HybridLanguageModelSessionSpec::prewarm);
     });
   }
 

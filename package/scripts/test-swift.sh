@@ -28,3 +28,4 @@ run_suite streaming ios/StreamingResponseAccumulator.swift tests/StreamingRespon
 run_suite schema ios/GenerationSchemaBuilder.swift ios/ToolContent.swift tests/GenerationSchemaBuilderTests.swift
 run_suite generation-failure ios/GenerationFailure.swift tests/GenerationFailureTests.swift
 run_suite generation-options ios/GenerationOptionsMapping.swift tests/GenerationOptionsMappingTests.swift
+run_suite transcript ios/TranscriptCoding.swift tests/TranscriptCodingTests.swift
