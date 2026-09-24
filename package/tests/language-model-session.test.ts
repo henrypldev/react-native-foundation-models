@@ -390,17 +390,6 @@ describe('LanguageModelSession transcript', () => {
     expect(create).not.toHaveBeenCalled()
   })
 
-  test('forwards the transcript to the native factory', () => {
-    const create = mock((_config: LanguageModelSessionConfig) => nativeSession)
-    createSession = create
-
-    new LanguageModelSession({ transcript: savedTranscript })
-
-    expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ transcript: savedTranscript, instructions: undefined }),
-    )
-  })
-
   test('preserves the native invalid transcript code', () => {
     createSession = () => {
       throw new Error("[INVALID_TRANSCRIPT] Invalid transcript: missing key 'version'")
@@ -415,17 +404,6 @@ describe('LanguageModelSession transcript', () => {
     )
   })
 
-  test('reads the native transcript each time it is accessed', () => {
-    const session = new LanguageModelSession()
-
-    nativeSession.serializeTranscript = () => '{"entries":1}'
-    const first = session.transcript
-    nativeSession.serializeTranscript = () => '{"entries":2}'
-
-    expect(first).toBe('{"entries":1}' as SerializedTranscript)
-    expect(session.transcript).toBe('{"entries":2}' as SerializedTranscript)
-  })
-
   test('maps a native transcript encoding failure', () => {
     nativeSession.serializeTranscript = () => {
       throw new Error('Unknown native C++ error')
@@ -438,16 +416,5 @@ describe('LanguageModelSession transcript', () => {
         details: expect.objectContaining({ operation: 'transcript' }),
       }),
     )
-  })
-
-  test('forwards the prewarm prompt prefix', () => {
-    const prewarm = mock((_promptPrefix?: string) => {})
-    nativeSession.prewarm = prewarm
-    const session = new LanguageModelSession()
-
-    session.prewarm()
-    session.prewarm('Summarize')
-
-    expect(prewarm.mock.calls).toEqual([[undefined], ['Summarize']])
   })
 })

@@ -1,7 +1,6 @@
 import Foundation
 
 public enum AppleAIError: Error, LocalizedError, CustomStringConvertible {
-    case sessionNotInitialized
     case sessionBusy
     case modelUnavailable(String)
     case toolCallError(Error)
@@ -23,8 +22,6 @@ public enum AppleAIError: Error, LocalizedError, CustomStringConvertible {
     
     public var errorDescription: String? {
         switch self {
-        case .sessionNotInitialized:
-            return "Language model session is not initialized"
         case .sessionBusy:
             return "Another language model request is already in progress for this session"
         case .modelUnavailable(let reason):
@@ -70,8 +67,6 @@ public enum AppleAIError: Error, LocalizedError, CustomStringConvertible {
     
     public var code: String {
         switch self {
-        case .sessionNotInitialized:
-            return "SESSION_NOT_INITIALIZED"
         case .sessionBusy:
             return "SESSION_BUSY"
         case .modelUnavailable:
