@@ -12,18 +12,12 @@ extension GenerationOptions {
             try exactly(Int.self, $0, field: "maximumResponseTokens")
         }
 
-        #if compiler(>=6.4)
-        self.init(samplingMode: samplingMode, temperature: native.temperature, maximumResponseTokens: maximumResponseTokens)
-        if #available(iOS 27.0, macOS 27.0, *), let toolCallingMode = native.toolCallingMode {
-            self.toolCallingMode = switch toolCallingMode {
-            case .allowed: .allowed
-            case .required: .required
-            case .disallowed: .disallowed
-            }
-        }
-        #else
-        self.init(sampling: samplingMode, temperature: native.temperature, maximumResponseTokens: maximumResponseTokens)
-        #endif
+        self.init(
+            samplingMode: samplingMode,
+            temperature: native.temperature,
+            maximumResponseTokens: maximumResponseTokens,
+            requestedToolCallingMode: native.toolCallingMode
+        )
     }
 
     private static func samplingMode(_ kind: NativeSamplingMode, of native: NativeGenerationOptions) throws -> SamplingMode {

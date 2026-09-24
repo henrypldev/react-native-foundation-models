@@ -7,13 +7,7 @@ private struct SessionState {
     var session: LanguageModelSession
     var isResponding = false
     var wasContextReset = false
-    var retiredSessionsUsage: NativeTokenUsage? = nil
-    var lastResponseUsage: NativeTokenUsage? = nil
-
-    mutating func retire(usageOf session: LanguageModelSession) {
-        guard let usage = session.tokenUsage else { return }
-        retiredSessionsUsage = retiredSessionsUsage.map { $0 + usage } ?? usage
-    }
+    var usage = UsageLedger()
 }
 
 @available(iOS 26.0, *)
@@ -71,7 +65,7 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
         guard let document = schema?.schemaDocument() else {
             guard !Self.isBlank(prompt) else { return Promise.resolved(withResult: "") }
             return generate(during: .response, options: options) { session, generationOptions in
-                let response = try await session.respond(to: prompt, options: generationOptions, native: options)
+                let response = try await session.respond(to: prompt, options: generationOptions, reasoningLevel: options?.reasoningLevel)
                 return (response.content, response.tokenUsage)
             }
         }
@@ -81,7 +75,7 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
                 to: prompt,
                 schema: generationSchema,
                 options: generationOptions,
-                native: options
+                reasoningLevel: options?.reasoningLevel
             )
             return (response.content.jsonString, response.tokenUsage)
         }
@@ -98,7 +92,7 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
             guard !Self.isBlank(prompt) else { return Promise.resolved(withResult: "") }
             return generate(during: .streaming, options: options) { session, generationOptions in
                 let last = try await consumeStreamingResponse(
-                    session.streamResponse(to: prompt, options: generationOptions, native: options)
+                    session.streamResponse(to: prompt, options: generationOptions, reasoningLevel: options?.reasoningLevel)
                 ) { onStream($0.content) }
                 return (last?.content ?? "", last?.tokenUsage)
             }
@@ -106,7 +100,12 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
         return generate(during: .streaming, options: options) { session, generationOptions in
             let generationSchema = try GenerationSchemaBuilder.responseSchema(from: document)
             let last = try await consumeStreamingResponse(
-                session.streamResponse(to: prompt, schema: generationSchema, options: generationOptions, native: options)
+                session.streamResponse(
+                    to: prompt,
+                    schema: generationSchema,
+                    options: generationOptions,
+                    reasoningLevel: options?.reasoningLevel
+                )
             ) { onStream($0.content.jsonString) }
             return (last?.content.jsonString ?? "", last?.tokenUsage)
         }
@@ -126,7 +125,7 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
 
             do {
                 let (content, usage) = try await request(modelSession, generationOptions)
-                self.state.withLock { $0.lastResponseUsage = usage }
+                self.state.withLock { $0.usage.finishRequest(using: usage) }
                 return content
             } catch {
                 throw try await self.failure(from: error, during: operation, in: modelSession)
@@ -145,15 +144,12 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
 
     @available(iOS 26.0, *)
     var usage: NativeTokenUsage? {
-        state.withLock { state in
-            guard let current = state.session.tokenUsage else { return nil }
-            return state.retiredSessionsUsage.map { $0 + current } ?? current
-        }
+        state.withLock { $0.usage.total(adding: $0.session.tokenUsage) }
     }
 
     @available(iOS 26.0, *)
     var lastResponseUsage: NativeTokenUsage? {
-        state.withLock { $0.lastResponseUsage }
+        state.withLock { $0.usage.lastResponse }
     }
 
     @available(iOS 26.0, *)
@@ -198,8 +194,8 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
                 instructions: "\(baseInstructions)\n\nPrevious conversation summary: \(summaryResponse.content)"
             )
             state.withLock { state in
-                state.retire(usageOf: previousSession)
-                state.retire(usageOf: summarySession)
+                state.usage.retire(previousSession.tokenUsage)
+                state.usage.retire(summarySession.tokenUsage)
                 state.session = newSession
                 state.wasContextReset = true
             }
@@ -244,7 +240,7 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
                 throw AppleAIError.sessionBusy
             }
             state.isResponding = true
-            state.lastResponseUsage = nil
+            state.usage.beginRequest()
             return state.session
         }
     }

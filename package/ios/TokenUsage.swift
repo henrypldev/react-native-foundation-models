@@ -1,6 +1,8 @@
-import FoundationModels
-
 extension NativeTokenUsage {
+    static var zero: NativeTokenUsage {
+        NativeTokenUsage(inputTokens: 0, cachedInputTokens: 0, outputTokens: 0, reasoningTokens: 0, totalTokens: 0)
+    }
+
     static func + (lhs: NativeTokenUsage, rhs: NativeTokenUsage) -> NativeTokenUsage {
         NativeTokenUsage(
             inputTokens: lhs.inputTokens + rhs.inputTokens,
@@ -12,17 +14,24 @@ extension NativeTokenUsage {
     }
 }
 
-#if compiler(>=6.4)
-@available(iOS 27.0, macOS 27.0, *)
-extension NativeTokenUsage {
-    init(_ usage: LanguageModelSession.Usage) {
-        self.init(
-            inputTokens: Double(usage.input.totalTokenCount),
-            cachedInputTokens: Double(usage.input.cachedTokenCount),
-            outputTokens: Double(usage.output.totalTokenCount),
-            reasoningTokens: Double(usage.output.reasoningTokenCount),
-            totalTokens: Double(usage.totalTokenCount)
-        )
+struct UsageLedger {
+    private var retired = NativeTokenUsage.zero
+    private(set) var lastResponse: NativeTokenUsage?
+
+    mutating func beginRequest() {
+        lastResponse = nil
+    }
+
+    mutating func finishRequest(using usage: NativeTokenUsage?) {
+        lastResponse = usage
+    }
+
+    mutating func retire(_ usage: NativeTokenUsage?) {
+        guard let usage else { return }
+        retired = retired + usage
+    }
+
+    func total(adding current: NativeTokenUsage?) -> NativeTokenUsage? {
+        current.map { retired + $0 }
     }
 }
-#endif
