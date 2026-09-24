@@ -4,9 +4,6 @@ import { isAppleAIError, parseNativeError } from '../errors'
 import type { LanguageModelSession } from '../LanguageModelSession'
 import type { GenerationOptions } from '../types'
 
-/**
- * Callbacks for one streamed request, plus the generation options it uses.
- */
 export interface StreamingOptions extends GenerationOptions {
   onToken?: (token: string) => void
   onComplete?: (fullResponse: string) => void
@@ -51,17 +48,19 @@ export function useStreamingResponse(
 
   const streamResponse = useCallback(
     async (prompt: string, options?: StreamingOptions): Promise<string> => {
+      const { onToken, onComplete, onError, ...generationOptions } = options ?? {}
+
       if (!session?.session) {
         const error = parseNativeError(new Error('Session not initialized'))
         setError(error)
-        options?.onError?.(error)
+        onError?.(error)
         throw error
       }
 
       if (isStreaming) {
         const error = parseNativeError(new Error('Another stream is already in progress'))
         setError(error)
-        options?.onError?.(error)
+        onError?.(error)
         throw error
       }
 
@@ -78,9 +77,9 @@ export function useStreamingResponse(
             if (isCancelledRef.current) return
 
             setResponse(streamedResponse)
-            options?.onToken?.(streamedResponse)
+            onToken?.(streamedResponse)
           },
-          options,
+          generationOptions,
         )
 
         activeStreamRef.current = streamPromise
@@ -90,7 +89,7 @@ export function useStreamingResponse(
         if (!isCancelledRef.current) {
           setIsComplete(true)
           setIsStreaming(false)
-          options?.onComplete?.(fullResponse)
+          onComplete?.(fullResponse)
         }
 
         return fullResponse
@@ -102,7 +101,7 @@ export function useStreamingResponse(
 
         if (!isCancelledRef.current) {
           setError(appleAIError)
-          options?.onError?.(appleAIError)
+          onError?.(appleAIError)
         }
 
         throw appleAIError
