@@ -54,28 +54,13 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
     }
     
     @available(iOS 26.0, *)
-    func respond(prompt: String, options: NativeGenerationOptions?) throws -> Promise<String> {
-        guard !Self.isBlank(prompt) else { return Promise.resolved(withResult: "") }
-        return generate(during: .response, options: options) { session, generationOptions in
-            try await session.respond(to: prompt, options: generationOptions).content
+    func respond(prompt: String, schema: AnyMap?, options: NativeGenerationOptions?) throws -> Promise<String> {
+        guard let document = schema?.schemaDocument() else {
+            guard !Self.isBlank(prompt) else { return Promise.resolved(withResult: "") }
+            return generate(during: .response, options: options) { session, generationOptions in
+                try await session.respond(to: prompt, options: generationOptions).content
+            }
         }
-    }
-
-    @available(iOS 26.0, *)
-    func streamResponse(prompt: String, onStream: @escaping (String) -> Void, options: NativeGenerationOptions?) throws -> Promise<String> {
-        guard !Self.isBlank(prompt) else { return Promise.resolved(withResult: "") }
-        return generate(during: .streaming, options: options) { session, generationOptions in
-            try await consumeStreamingResponse(
-                session.streamResponse(to: prompt, options: generationOptions),
-                content: { $0.content },
-                onContent: onStream
-            )
-        }
-    }
-
-    @available(iOS 26.0, *)
-    func respondWithSchema(prompt: String, schema: AnyMap, options: NativeGenerationOptions?) throws -> Promise<String> {
-        let document = schema.schemaDocument()
         return generate(during: .response, options: options) { session, generationOptions in
             let generationSchema = try GenerationSchemaBuilder.responseSchema(from: document)
             return try await session.respond(to: prompt, schema: generationSchema, options: generationOptions)
@@ -84,13 +69,22 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
     }
 
     @available(iOS 26.0, *)
-    func streamResponseWithSchema(
+    func streamResponse(
         prompt: String,
-        schema: AnyMap,
         onStream: @escaping (String) -> Void,
+        schema: AnyMap?,
         options: NativeGenerationOptions?
     ) throws -> Promise<String> {
-        let document = schema.schemaDocument()
+        guard let document = schema?.schemaDocument() else {
+            guard !Self.isBlank(prompt) else { return Promise.resolved(withResult: "") }
+            return generate(during: .streaming, options: options) { session, generationOptions in
+                try await consumeStreamingResponse(
+                    session.streamResponse(to: prompt, options: generationOptions),
+                    content: { $0.content },
+                    onContent: onStream
+                )
+            }
+        }
         return generate(during: .streaming, options: options) { session, generationOptions in
             let generationSchema = try GenerationSchemaBuilder.responseSchema(from: document)
             return try await consumeStreamingResponse(

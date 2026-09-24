@@ -1,38 +1,26 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
-import type { AnyMap } from 'react-native-nitro-modules'
+import type { HybridObject } from 'react-native-nitro-modules'
 import { z } from 'zod'
-import type { NativeGenerationOptions } from '../src/specs/LanguageModelSession.nitro'
+import type {
+  LanguageModelSessionFactory,
+  LanguageModelSession as LanguageModelSessionSpec,
+} from '../src/specs/LanguageModelSession.nitro'
 
-interface NativeSessionMock {
-  respond: (prompt: string, options?: NativeGenerationOptions) => Promise<string>
-  streamResponse: (
-    prompt: string,
-    onChunk: (chunk: string) => void,
-    options?: NativeGenerationOptions,
-  ) => Promise<string>
-  respondWithSchema: (
-    prompt: string,
-    schema: AnyMap,
-    options?: NativeGenerationOptions,
-  ) => Promise<string>
-  streamResponseWithSchema: (
-    prompt: string,
-    schema: AnyMap,
-    onChunk: (json: string) => void,
-    options?: NativeGenerationOptions,
-  ) => Promise<string>
-  tokenCount: (prompt: string) => Promise<number>
-  wasContextReset: boolean
-}
+type NativeSession = Omit<LanguageModelSessionSpec, keyof HybridObject<{ ios: 'swift' }>>
 
-let nativeSession: NativeSessionMock
-let createSession: () => NativeSessionMock
+let nativeSession: NativeSession
+let createSession: () => NativeSession
 
 const factory = {
   isAvailable: true,
   availabilityStatus: 'available',
   contextSize: 4096,
   create: () => createSession(),
+} satisfies Omit<
+  LanguageModelSessionFactory,
+  keyof HybridObject<{ ios: 'swift' }> | 'create'
+> & {
+  create: () => NativeSession
 }
 
 mock.module('react-native-nitro-modules', () => ({
@@ -45,7 +33,6 @@ mock.module('react-native', () => ({
   Platform: { OS: 'ios', Version: '26.4' },
 }))
 
-const { AppleAIError } = await import('../src/errors')
 const { LanguageModelSession } = await import('../src/LanguageModelSession')
 
 beforeEach(() => {
@@ -56,8 +43,6 @@ beforeEach(() => {
       onChunk('complete')
       return 'complete'
     },
-    respondWithSchema: async () => '{}',
-    streamResponseWithSchema: async () => '{}',
     tokenCount: async () => 3,
     wasContextReset: false,
   }
@@ -133,7 +118,7 @@ describe('LanguageModelSession native boundary', () => {
     }
 
     expect(() => new LanguageModelSession()).toThrow(
-      expect.objectContaining<Partial<InstanceType<typeof AppleAIError>>>({
+      expect.objectContaining({
         name: 'AppleAIError',
         code: 'SESSION_INITIALIZATION_ERROR',
         details: expect.objectContaining({ operation: 'createSession' }),
@@ -159,11 +144,13 @@ describe('LanguageModelSession native boundary', () => {
 
     expect(respond).toHaveBeenCalledWith(
       'Hello',
+      undefined,
       expect.objectContaining({ maximumResponseTokens: 5, samplingMode: 'greedy' }),
     )
     expect(streamResponse).toHaveBeenCalledWith(
       'Hello',
       expect.any(Function),
+      undefined,
       expect.objectContaining({
         samplingMode: 'randomTopK',
         samplingTop: 3,
@@ -210,8 +197,8 @@ const recipeJson = JSON.stringify({
 
 describe('LanguageModelSession structured output', () => {
   test('sends the sanitized response schema and resolves with the parsed value', async () => {
-    const respondWithSchema = mock(async () => recipeJson)
-    nativeSession.respondWithSchema = respondWithSchema
+    const respond = mock(async () => recipeJson)
+    nativeSession.respond = respond
 
     const session = new LanguageModelSession()
     const recipe = await session.respond('A pasta recipe', {
@@ -225,7 +212,7 @@ describe('LanguageModelSession structured output', () => {
       ingredients: [{ name: 'spaghetti', grams: 200 }],
       servings: 2,
     })
-    expect(respondWithSchema).toHaveBeenCalledWith(
+    expect(respond).toHaveBeenCalledWith(
       'A pasta recipe',
       {
         type: 'object',
@@ -249,7 +236,7 @@ describe('LanguageModelSession structured output', () => {
   })
 
   test('rejects a response that does not match the schema with the Zod issues', async () => {
-    nativeSession.respondWithSchema = async () =>
+    nativeSession.respond = async () =>
       JSON.stringify({ title: 'Pasta', difficulty: 'medium', ingredients: [] })
 
     const session = new LanguageModelSession()
@@ -267,7 +254,7 @@ describe('LanguageModelSession structured output', () => {
   })
 
   test('rejects a response that is not JSON', async () => {
-    nativeSession.respondWithSchema = async () => '{"title": "Pas'
+    nativeSession.respond = async () => '{"title": "Pas'
 
     const session = new LanguageModelSession()
 
@@ -280,8 +267,8 @@ describe('LanguageModelSession structured output', () => {
   })
 
   test('rejects an unsupported schema before the request reaches native', async () => {
-    const respondWithSchema = mock(async () => '{}')
-    nativeSession.respondWithSchema = respondWithSchema
+    const respond = mock(async () => '{}')
+    nativeSession.respond = respond
 
     const session = new LanguageModelSession()
 
@@ -293,7 +280,7 @@ describe('LanguageModelSession structured output', () => {
       code: 'SCHEMA_CREATION_ERROR',
       message: expect.stringContaining("'response.id'"),
     })
-    expect(respondWithSchema).not.toHaveBeenCalled()
+    expect(respond).not.toHaveBeenCalled()
   })
 
   test('rejects a schema without an object at the root', async () => {
@@ -308,7 +295,7 @@ describe('LanguageModelSession structured output', () => {
   })
 
   test('preserves typed native failures from the schema request', async () => {
-    nativeSession.respondWithSchema = async () => {
+    nativeSession.respond = async () => {
       throw new Error('[CONTEXT_EXCEEDED] The context window is full')
     }
 
@@ -320,7 +307,7 @@ describe('LanguageModelSession structured output', () => {
   })
 
   test('streams unvalidated partial objects and resolves with the parsed value', async () => {
-    nativeSession.streamResponseWithSchema = async (_prompt, _schema, onChunk) => {
+    nativeSession.streamResponse = async (_prompt, onChunk) => {
       onChunk('{"title": "Pa"}')
       onChunk('{"difficulty": "", "title": "Pasta"}')
       onChunk('{"title": "Pasta", "difficulty": "easy", "ingredients": [{}]}')
@@ -346,7 +333,7 @@ describe('LanguageModelSession structured output', () => {
   })
 
   test('rejects a stream whose final value does not match the schema', async () => {
-    nativeSession.streamResponseWithSchema = async (_prompt, _schema, onChunk) => {
+    nativeSession.streamResponse = async (_prompt, onChunk) => {
       onChunk('{"title": "Pasta"}')
       return '{"title": "Pasta"}'
     }
@@ -363,7 +350,7 @@ describe('LanguageModelSession structured output', () => {
 
   test('rejects a stream whose snapshot is not JSON instead of blaming the callback', async () => {
     const onChunk = mock(() => {})
-    nativeSession.streamResponseWithSchema = async (_prompt, _schema, emit) => {
+    nativeSession.streamResponse = async (_prompt, emit) => {
       emit('{"title": "Pa')
       return recipeJson
     }
