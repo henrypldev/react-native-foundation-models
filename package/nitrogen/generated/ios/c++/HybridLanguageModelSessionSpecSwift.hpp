@@ -21,8 +21,9 @@ namespace margelo::nitro::rnfoundationmodels { enum class NativeToolCallingMode;
 
 #include <string>
 #include <NitroModules/Promise.hpp>
-#include "NativeGenerationOptions.hpp"
+#include <NitroModules/AnyMap.hpp>
 #include <optional>
+#include "NativeGenerationOptions.hpp"
 #include "NativeSamplingMode.hpp"
 #include "NativeToolCallingMode.hpp"
 #include <functional>
@@ -79,16 +80,16 @@ namespace margelo::nitro::rnfoundationmodels {
 
   public:
     // Methods
-    inline std::shared_ptr<Promise<std::string>> respond(const std::string& prompt, const std::optional<NativeGenerationOptions>& options) override {
-      auto __result = _swiftPart.respond(prompt, options);
+    inline std::shared_ptr<Promise<std::string>> respond(const std::string& prompt, const std::optional<std::shared_ptr<AnyMap>>& schema, const std::optional<NativeGenerationOptions>& options) override {
+      auto __result = _swiftPart.respond(prompt, schema, options);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
       auto __value = std::move(__result.value());
       return __value;
     }
-    inline std::shared_ptr<Promise<std::string>> streamResponse(const std::string& prompt, const std::function<void(const std::string& /* stream */)>& onStream, const std::optional<NativeGenerationOptions>& options) override {
-      auto __result = _swiftPart.streamResponse(prompt, onStream, options);
+    inline std::shared_ptr<Promise<std::string>> streamResponse(const std::string& prompt, const std::function<void(const std::string& /* stream */)>& onStream, const std::optional<std::shared_ptr<AnyMap>>& schema, const std::optional<NativeGenerationOptions>& options) override {
+      auto __result = _swiftPart.streamResponse(prompt, onStream, schema, options);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

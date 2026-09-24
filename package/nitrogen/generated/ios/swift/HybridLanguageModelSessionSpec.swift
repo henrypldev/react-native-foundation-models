@@ -13,8 +13,8 @@ public protocol HybridLanguageModelSessionSpec_protocol: HybridObject {
   var wasContextReset: Bool { get }
 
   // Methods
-  func respond(prompt: String, options: NativeGenerationOptions?) throws -> Promise<String>
-  func streamResponse(prompt: String, onStream: @escaping (_ stream: String) -> Void, options: NativeGenerationOptions?) throws -> Promise<String>
+  func respond(prompt: String, schema: AnyMap?, options: NativeGenerationOptions?) throws -> Promise<String>
+  func streamResponse(prompt: String, onStream: @escaping (_ stream: String) -> Void, schema: AnyMap?, options: NativeGenerationOptions?) throws -> Promise<String>
   func tokenCount(prompt: String) throws -> Promise<Double>
 }
 

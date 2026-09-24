@@ -3,7 +3,8 @@ import { join } from 'node:path'
 import { describe, expect, test } from 'bun:test'
 import { z } from 'zod'
 import { ArgumentParsingError, SchemaCreationError } from '../src/errors'
-import { createTool, KEYWORDS, UNSUPPORTED_HINTS } from '../src/tool-utils'
+import { KEYWORDS, UNSUPPORTED_HINTS } from '../src/generation-schema'
+import { createTool } from '../src/tool-utils'
 
 const makeTool = <T extends z.ZodObject<any>>(
   args: T,
@@ -267,7 +268,7 @@ describe('rejection keyword contract fixture', () => {
   })
 
   test('no fixture keyword is whitelisted for any type', () => {
-    const whitelisted = new Set(Object.values(KEYWORDS).flat())
+    const whitelisted = new Set<string>(Object.values(KEYWORDS).flat())
     for (const keyword of fixture) {
       expect(whitelisted.has(keyword)).toBe(false)
     }

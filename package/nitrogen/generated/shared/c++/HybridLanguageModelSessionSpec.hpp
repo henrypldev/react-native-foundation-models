@@ -18,8 +18,9 @@ namespace margelo::nitro::rnfoundationmodels { struct NativeGenerationOptions; }
 
 #include <string>
 #include <NitroModules/Promise.hpp>
-#include "NativeGenerationOptions.hpp"
+#include <NitroModules/AnyMap.hpp>
 #include <optional>
+#include "NativeGenerationOptions.hpp"
 #include <functional>
 
 namespace margelo::nitro::rnfoundationmodels {
@@ -53,8 +54,8 @@ namespace margelo::nitro::rnfoundationmodels {
 
     public:
       // Methods
-      virtual std::shared_ptr<Promise<std::string>> respond(const std::string& prompt, const std::optional<NativeGenerationOptions>& options) = 0;
-      virtual std::shared_ptr<Promise<std::string>> streamResponse(const std::string& prompt, const std::function<void(const std::string& /* stream */)>& onStream, const std::optional<NativeGenerationOptions>& options) = 0;
+      virtual std::shared_ptr<Promise<std::string>> respond(const std::string& prompt, const std::optional<std::shared_ptr<AnyMap>>& schema, const std::optional<NativeGenerationOptions>& options) = 0;
+      virtual std::shared_ptr<Promise<std::string>> streamResponse(const std::string& prompt, const std::function<void(const std::string& /* stream */)>& onStream, const std::optional<std::shared_ptr<AnyMap>>& schema, const std::optional<NativeGenerationOptions>& options) = 0;
       virtual std::shared_ptr<Promise<double>> tokenCount(const std::string& prompt) = 0;
 
     protected:

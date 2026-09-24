@@ -107,6 +107,21 @@ namespace margelo::nitro::rnfoundationmodels::bridge::swift {
     return Func_void_std__exception_ptr_Wrapper(std::move(value));
   }
   
+  // pragma MARK: std::optional<std::shared_ptr<AnyMap>>
+  /**
+   * Specialized version of `std::optional<std::shared_ptr<AnyMap>>`.
+   */
+  using std__optional_std__shared_ptr_AnyMap__ = std::optional<std::shared_ptr<AnyMap>>;
+  inline std::optional<std::shared_ptr<AnyMap>> create_std__optional_std__shared_ptr_AnyMap__(const std::shared_ptr<AnyMap>& value) noexcept {
+    return std::optional<std::shared_ptr<AnyMap>>(value);
+  }
+  inline bool has_value_std__optional_std__shared_ptr_AnyMap__(const std::optional<std::shared_ptr<AnyMap>>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline std::shared_ptr<AnyMap> get_std__optional_std__shared_ptr_AnyMap__(const std::optional<std::shared_ptr<AnyMap>>& optional) noexcept {
+    return optional.value();
+  }
+  
   // pragma MARK: std::optional<double>
   /**
    * Specialized version of `std::optional<double>`.

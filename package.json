@@ -11,7 +11,7 @@
   "scripts": {
     "test": "bun --cwd package test",
     "test:swift": "bun --cwd package test:swift",
-    "typecheck": "bun tsc -p ./package --noEmit",
+    "typecheck": "bun tsc -p ./package --noEmit && bun tsc -p ./package/tsconfig.test.json",
     "lint": "biome lint .",
     "format": "biome format --write .",
     "format:check": "biome check --formatter-enabled=true --linter-enabled=false --assist-enabled=false .",

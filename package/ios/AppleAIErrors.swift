@@ -32,7 +32,7 @@ public enum AppleAIError: Error, LocalizedError, CustomStringConvertible {
         case .toolExecutionError(let toolName, let error):
             return "Tool '\(toolName)' execution failed: \(error.localizedDescription)"
         case .schemaCreationError(let details):
-            return "Failed to create tool schema: \(details)"
+            return "Failed to create schema: \(details)"
         case .argumentParsingError(let details):
             return "Failed to parse tool arguments: \(details)"
         case .responseParsingError(let details):

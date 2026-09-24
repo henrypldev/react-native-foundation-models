@@ -130,9 +130,16 @@ open class HybridLanguageModelSessionSpec_cxx {
 
   // Methods
   @inline(__always)
-  public final func respond(prompt: std.string, options: bridge.std__optional_NativeGenerationOptions_) -> bridge.Result_std__shared_ptr_Promise_std__string___ {
+  public final func respond(prompt: std.string, schema: bridge.std__optional_std__shared_ptr_AnyMap__, options: bridge.std__optional_NativeGenerationOptions_) -> bridge.Result_std__shared_ptr_Promise_std__string___ {
     do {
-      let __result = try self.__implementation.respond(prompt: String(prompt), options: options.value)
+      let __result = try self.__implementation.respond(prompt: String(prompt), schema: { () -> AnyMap? in
+        if bridge.has_value_std__optional_std__shared_ptr_AnyMap__(schema) {
+          let __unwrapped = bridge.get_std__optional_std__shared_ptr_AnyMap__(schema)
+          return AnyMap(withCppPart: __unwrapped)
+        } else {
+          return nil
+        }
+      }(), options: options.value)
       let __resultCpp = { () -> bridge.std__shared_ptr_Promise_std__string__ in
         let __promise = bridge.create_std__shared_ptr_Promise_std__string__()
         let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_std__string__(__promise)
@@ -149,12 +156,19 @@ open class HybridLanguageModelSessionSpec_cxx {
   }
   
   @inline(__always)
-  public final func streamResponse(prompt: std.string, onStream: bridge.Func_void_std__string, options: bridge.std__optional_NativeGenerationOptions_) -> bridge.Result_std__shared_ptr_Promise_std__string___ {
+  public final func streamResponse(prompt: std.string, onStream: bridge.Func_void_std__string, schema: bridge.std__optional_std__shared_ptr_AnyMap__, options: bridge.std__optional_NativeGenerationOptions_) -> bridge.Result_std__shared_ptr_Promise_std__string___ {
     do {
       let __result = try self.__implementation.streamResponse(prompt: String(prompt), onStream: { () -> (String) -> Void in
         let __wrappedFunction = bridge.wrap_Func_void_std__string(onStream)
         return { (__stream: String) -> Void in
           __wrappedFunction.call(std.string(__stream))
+        }
+      }(), schema: { () -> AnyMap? in
+        if bridge.has_value_std__optional_std__shared_ptr_AnyMap__(schema) {
+          let __unwrapped = bridge.get_std__optional_std__shared_ptr_AnyMap__(schema)
+          return AnyMap(withCppPart: __unwrapped)
+        } else {
+          return nil
         }
       }(), options: options.value)
       let __resultCpp = { () -> bridge.std__shared_ptr_Promise_std__string__ in
