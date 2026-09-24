@@ -1,3 +1,10 @@
+import type {
+  NativeModelCapability,
+  NativeReasoningLevel,
+  NativeTokenUsage,
+  NativeToolCallingMode,
+} from './specs/LanguageModelSession.nitro'
+
 export interface GenerableProperty {
   type: 'string' | 'number' | 'boolean' | 'array' | 'object'
   guide?: {
@@ -36,7 +43,7 @@ export type FoundationModelsModelFamily = '26.0-26.3' | '26.4+'
  * `checkFoundationModelsAvailability().capabilities` before you use a feature
  * that not every model has, such as `reasoningLevel`.
  */
-export type ModelCapability = 'vision' | 'guidedGeneration' | 'reasoning' | 'toolCalling'
+export type ModelCapability = NativeModelCapability
 
 export type AvailabilityStatus =
   | 'available'
@@ -75,13 +82,7 @@ export interface FoundationModelsAvailability {
  * its cache. `reasoningTokens` is the part of `outputTokens` the model spent
  * on reasoning. `totalTokens` is `inputTokens + outputTokens`.
  */
-export interface TokenUsage {
-  inputTokens: number
-  cachedInputTokens: number
-  outputTokens: number
-  reasoningTokens: number
-  totalTokens: number
-}
+export type TokenUsage = NativeTokenUsage
 
 /**
  * How the model picks each next token.
@@ -101,12 +102,12 @@ export type SamplingMode =
 /**
  * Whether the model may, must, or must not call the session's tools.
  */
-export type ToolCallingMode = 'allowed' | 'required' | 'disallowed'
+export type ToolCallingMode = NativeToolCallingMode
 
 /**
  * How much the model reasons before it answers.
  */
-export type ReasoningLevel = 'light' | 'moderate' | 'deep'
+export type ReasoningLevel = NativeReasoningLevel
 
 /**
  * Options that control a single `respond` or `streamResponse` request.
