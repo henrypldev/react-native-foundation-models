@@ -22,28 +22,41 @@ constructor(config?: LanguageModelSessionConfig)
 
 ### Instance Methods
 
-#### `respond(prompt)`
+#### `respond(prompt, options?)`
 
 Generates a complete response from the language model.
 
 ```typescript
-respond(prompt: string): Promise<string>
+respond(prompt: string, options?: GenerationOptions): Promise<string>
 ```
 
 **Parameters**:
 - `prompt: string` - The user's message
+- `options?: GenerationOptions` - Sampling, temperature, and length limits for this request. See [`GenerationOptions`](#generationoptions)
 
-#### `streamResponse(prompt, callback)`
+```typescript
+const answer = await session.respond('Name a color', {
+  samplingMode: { kind: 'greedy' },
+  maximumResponseTokens: 20,
+});
+```
+
+#### `streamResponse(prompt, callback, options?)`
 
 Initiates a streaming response from the language model.
 
 ```typescript
-streamResponse(prompt: string, onChunk: (responseSoFar: string) => void): Promise<string>
+streamResponse(
+  prompt: string,
+  onChunk: (responseSoFar: string) => void,
+  options?: GenerationOptions,
+): Promise<string>
 ```
 
 **Parameters**:
 - `prompt: string` - The user's message
 - `onChunk: (responseSoFar: string) => void` - Called with the full streamed response so far
+- `options?: GenerationOptions` - Sampling, temperature, and length limits for this request. See [`GenerationOptions`](#generationoptions)
 
 #### `tokenCount(prompt)`
 
@@ -119,7 +132,7 @@ function useLanguageModel(config?: UseLanguageModelConfig): UseLanguageModelRetu
 - `response: string` - Latest response from the AI
 - `loading: boolean` - Whether a request is in progress
 - `error: AppleAIError | null` - Last error that occurred
-- `send: (prompt: string) => Promise<string>` - Function to send messages
+- `send: (prompt: string, options?: GenerationOptions) => Promise<string>` - Function to send messages, with optional per-request generation options
 - `reset: () => void` - Reset response and error state
 - `isSessionReady: boolean` - Whether session is initialized and ready
 
@@ -168,6 +181,31 @@ type AvailabilityStatus =
   | 'unavailable.modelNotReady'
   | 'unavailable.unknown'
 ```
+
+### `GenerationOptions`
+
+Options for one `respond` or `streamResponse` request. All fields are optional. Invalid values reject the request with an `INVALID_GENERATION_OPTIONS` error before it reaches the model. The error's `details.field` names the invalid field.
+
+```typescript
+interface GenerationOptions {
+  temperature?: number;
+  maximumResponseTokens?: number;
+  samplingMode?: SamplingMode;
+  toolCallingMode?: ToolCallingMode;
+}
+
+type SamplingMode =
+  | { kind: 'greedy' }
+  | { kind: 'randomTopK'; top: number; seed?: number }
+  | { kind: 'randomProbabilityThreshold'; probabilityThreshold: number; seed?: number };
+
+type ToolCallingMode = 'allowed' | 'required' | 'disallowed';
+```
+
+- `temperature` - A finite number of 0 or more. Lower values give more predictable output.
+- `maximumResponseTokens` - A positive integer. The response stops at this many tokens. In a session with tools, a very small value (for example 5) can reject with `DECODING_FAILURE`.
+- `samplingMode` - How the model picks each token. `greedy` always picks the most likely token. `randomTopK` samples from the `top` most likely tokens (`top` is an integer of 1 or more). `randomProbabilityThreshold` samples from the smallest set of tokens whose probabilities add up to `probabilityThreshold` (greater than 0, at most 1). `seed` is an optional non-negative integer that makes random sampling repeatable.
+- `toolCallingMode` - Whether the model may (`allowed`), must (`required`), or must not (`disallowed`) call tools. iOS 27 and later only. iOS 26 ignores it. With `required`, the model calls a tool at every step. On the iOS 27.0 simulator it kept calling the tool and the request did not end normally, so prefer `allowed` unless your tool loop has an exit.
 
 ### `LanguageModelSessionConfig`
 
@@ -231,18 +269,21 @@ class AppleAIError extends Error {
 - `UNSUPPORTED_TRANSCRIPT_CONTENT` - The session transcript has content the model does not support (iOS 27+)
 - `TIMEOUT` - The request timed out (iOS 27+)
 - `TOKEN_COUNT_ERROR` - Token counting failed
+- `INVALID_GENERATION_OPTIONS` - A `GenerationOptions` value is invalid. `details.field` names the field
 
 The same failure has the same code on iOS 26 and iOS 27.
 
 ### `StreamingOptions`
 
 ```typescript
-interface StreamingOptions {
+interface StreamingOptions extends GenerationOptions {
   onToken?: (token: string) => void;
   onComplete?: (fullResponse: string) => void;
   onError?: (error: AppleAIError) => void;
 }
 ```
+
+The generation fields apply to that stream. The callbacks are not sent to the model.
 
 ## Utilities
 

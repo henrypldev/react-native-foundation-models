@@ -1,8 +1,13 @@
 import { beforeEach, describe, expect, mock, test } from 'bun:test'
+import type { NativeGenerationOptions } from '../src/specs/LanguageModelSession.nitro'
 
 interface NativeSessionMock {
-  respond: (prompt: string) => Promise<string>
-  streamResponse: (prompt: string, onChunk: (chunk: string) => void) => Promise<string>
+  respond: (prompt: string, options?: NativeGenerationOptions) => Promise<string>
+  streamResponse: (
+    prompt: string,
+    onChunk: (chunk: string) => void,
+    options?: NativeGenerationOptions,
+  ) => Promise<string>
   tokenCount: (prompt: string) => Promise<number>
   wasContextReset: boolean
 }
@@ -119,5 +124,58 @@ describe('LanguageModelSession native boundary', () => {
         details: expect.objectContaining({ operation: 'createSession' }),
       }),
     )
+  })
+
+  test('forwards converted generation options to the native session', async () => {
+    const respond = mock(async () => 'response')
+    const streamResponse = mock(async () => 'complete')
+    nativeSession.respond = respond
+    nativeSession.streamResponse = streamResponse
+    const onChunk = () => {}
+
+    const session = new LanguageModelSession()
+    await session.respond('Hello', {
+      maximumResponseTokens: 5,
+      samplingMode: { kind: 'greedy' },
+    })
+    await session.streamResponse('Hello', onChunk, {
+      samplingMode: { kind: 'randomTopK', top: 3, seed: 1 },
+    })
+
+    expect(respond).toHaveBeenCalledWith(
+      'Hello',
+      expect.objectContaining({ maximumResponseTokens: 5, samplingMode: 'greedy' }),
+    )
+    expect(streamResponse).toHaveBeenCalledWith(
+      'Hello',
+      expect.any(Function),
+      expect.objectContaining({
+        samplingMode: 'randomTopK',
+        samplingTop: 3,
+        samplingSeed: 1,
+      }),
+    )
+  })
+
+  test('rejects invalid generation options without calling native', async () => {
+    const respond = mock(async () => 'response')
+    const streamResponse = mock(async () => 'complete')
+    nativeSession.respond = respond
+    nativeSession.streamResponse = streamResponse
+
+    const session = new LanguageModelSession()
+
+    await expect(session.respond('Hello', { temperature: -1 })).rejects.toMatchObject({
+      code: 'INVALID_GENERATION_OPTIONS',
+      details: { field: 'temperature', value: -1 },
+    })
+    await expect(
+      session.streamResponse('Hello', () => {}, { toolCallingMode: 'never' as never }),
+    ).rejects.toMatchObject({
+      code: 'INVALID_GENERATION_OPTIONS',
+      details: { field: 'toolCallingMode' },
+    })
+    expect(respond).not.toHaveBeenCalled()
+    expect(streamResponse).not.toHaveBeenCalled()
   })
 })

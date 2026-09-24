@@ -1,5 +1,5 @@
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect'
-import { useCallback, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -32,6 +32,7 @@ interface WeatherDemoProps {
   metrics?: UsageMetrics
   title?: string
   subtitle?: string
+  children?: ReactNode
 }
 
 const glassAvailable = isLiquidGlassAvailable()
@@ -47,6 +48,7 @@ export function WeatherDemo({
   metrics,
   title = 'Foundation Models',
   subtitle = 'On-device weather tool demo',
+  children,
 }: WeatherDemoProps) {
   const [prompt, setPrompt] = useState('')
   const insets = useSafeAreaInsets()
@@ -103,6 +105,8 @@ export function WeatherDemo({
             {response || 'Ask about the weather to start a session.'}
           </Text>
         </View>
+
+        {children}
 
         <View style={[styles.card, { borderColor, backgroundColor: cardColor }]}>
           <Text style={[styles.cardLabel, { color: mutedColor }]}>SESSION USAGE</Text>

@@ -14,9 +14,27 @@ export interface LanguageModelSessionConfig {
   guardrails?: string
 }
 
+export type NativeSamplingMode = 'greedy' | 'randomTopK' | 'randomProbabilityThreshold'
+
+export type NativeToolCallingMode = 'allowed' | 'required' | 'disallowed'
+
+export interface NativeGenerationOptions {
+  temperature?: number
+  maximumResponseTokens?: number
+  samplingMode?: NativeSamplingMode
+  samplingTop?: number
+  samplingProbabilityThreshold?: number
+  samplingSeed?: number
+  toolCallingMode?: NativeToolCallingMode
+}
+
 export interface LanguageModelSession extends HybridObject<{ ios: 'swift' }> {
-  respond(prompt: string): Promise<string>
-  streamResponse(prompt: string, onStream: (stream: string) => void): Promise<string>
+  respond(prompt: string, options?: NativeGenerationOptions): Promise<string>
+  streamResponse(
+    prompt: string,
+    onStream: (stream: string) => void,
+    options?: NativeGenerationOptions,
+  ): Promise<string>
   tokenCount(prompt: string): Promise<number>
   readonly wasContextReset: boolean
 }
