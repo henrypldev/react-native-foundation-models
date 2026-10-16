@@ -17,3 +17,10 @@ swiftc -parse-as-library -module-cache-path "$CACHE" \
   tests/ToolSchemaBuilderTests.swift \
   -o /tmp/rn-foundation-models-schema-tests
 /tmp/rn-foundation-models-schema-tests
+
+swiftc -parse-as-library -module-cache-path "$CACHE" \
+  ios/AppleAIErrors.swift \
+  ios/FoundationModelsErrorMapping.swift \
+  tests/FoundationModelsErrorMappingTests.swift \
+  -o /tmp/rn-foundation-models-error-mapping-tests
+/tmp/rn-foundation-models-error-mapping-tests
