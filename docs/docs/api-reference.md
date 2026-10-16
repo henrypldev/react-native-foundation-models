@@ -242,7 +242,7 @@ type ToolCallingMode = 'allowed' | 'required' | 'disallowed';
 ### `StructuredGenerationOptions`
 
 ```typescript
-type ObjectSchema = z.ZodObject<any>;
+type ObjectSchema = z.ZodObject;
 
 interface StructuredGenerationOptions<S extends ObjectSchema> extends GenerationOptions {
   schema: S;
