@@ -17,6 +17,7 @@ public enum AppleAIError: Error, LocalizedError, CustomStringConvertible {
     case contextRecoveryFailed(Error)
     case unsupportedPlatform(String)
     case tokenCountError(Error)
+    case invalidGenerationOptions(String)
     
     public var errorDescription: String? {
         switch self {
@@ -52,6 +53,8 @@ public enum AppleAIError: Error, LocalizedError, CustomStringConvertible {
             return message
         case .tokenCountError(let error):
             return "Token count failed: \(error.localizedDescription)"
+        case .invalidGenerationOptions(let details):
+            return "Invalid generation options: \(details)"
         }
     }
     
@@ -93,6 +96,8 @@ public enum AppleAIError: Error, LocalizedError, CustomStringConvertible {
             return "UNSUPPORTED_PLATFORM"
         case .tokenCountError:
             return "TOKEN_COUNT_ERROR"
+        case .invalidGenerationOptions:
+            return "INVALID_GENERATION_OPTIONS"
         }
     }
 }

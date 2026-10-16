@@ -1,10 +1,13 @@
 import { useCallback, useState } from 'react'
+import { StyleSheet, Switch } from 'react-native'
 import {
   createTool,
+  type GenerationOptions,
   getFoundationModelsContextSize,
   LanguageModelSession,
 } from 'react-native-foundation-models'
 import { z } from 'zod'
+import { Text, useThemeColor, View } from '@/components/Themed'
 import { WeatherDemo } from '@/components/WeatherDemo'
 import { getTokenMetrics, type TokenMetrics } from '@/utils/tokenMetrics'
 import { weatherResult } from '@/utils/weatherResult'
@@ -52,27 +55,40 @@ export default function IndexScreen() {
   const [loading, setLoading] = useState(false)
   const [tokenMetrics, setTokenMetrics] = useState<TokenMetrics>()
   const [contextReset, setContextReset] = useState(false)
+  const [greedy, setGreedy] = useState(false)
+  const [capTokens, setCapTokens] = useState(false)
+  const mutedColor = useThemeColor({}, 'muted')
+  const borderColor = useThemeColor({}, 'border')
+  const cardColor = useThemeColor({}, 'card')
 
-  const handleSubmit = useCallback(async (prompt: string) => {
-    setLoading(true)
-    setResult('')
-    setTokenMetrics(undefined)
-    setContextReset(false)
-
-    try {
-      const fullResponse = await session.respond(prompt)
-      setResult(fullResponse)
-      setTokenMetrics(await getTokenMetrics(session, prompt, fullResponse))
-      setContextReset(session.wasContextReset)
-    } catch (error) {
-      console.error('Failed to get response:', error)
-      setResult('Error: Failed to get response')
+  const handleSubmit = useCallback(
+    async (prompt: string) => {
+      setLoading(true)
+      setResult('')
       setTokenMetrics(undefined)
-      setContextReset(session.wasContextReset)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+      setContextReset(false)
+
+      const generationOptions: GenerationOptions = {
+        samplingMode: greedy ? { kind: 'greedy' } : undefined,
+        maximumResponseTokens: capTokens ? 30 : undefined,
+      }
+
+      try {
+        const fullResponse = await session.respond(prompt, generationOptions)
+        setResult(fullResponse)
+        setTokenMetrics(await getTokenMetrics(session, prompt, fullResponse))
+        setContextReset(session.wasContextReset)
+      } catch (error) {
+        console.error('Failed to get response:', error)
+        setResult('Error: Failed to get response')
+        setTokenMetrics(undefined)
+        setContextReset(session.wasContextReset)
+      } finally {
+        setLoading(false)
+      }
+    },
+    [greedy, capTokens],
+  )
 
   return (
     <WeatherDemo
@@ -86,6 +102,52 @@ export default function IndexScreen() {
         tokens: tokenMetrics,
         contextReset,
       }}
-    />
+    >
+      <View style={[styles.card, { borderColor, backgroundColor: cardColor }]}>
+        <Text style={[styles.cardLabel, { color: mutedColor }]}>GENERATION OPTIONS</Text>
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>Greedy sampling</Text>
+          <Switch
+            testID="generation-greedy-toggle"
+            accessibilityLabel="Greedy sampling"
+            value={greedy}
+            onValueChange={setGreedy}
+          />
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>Cap at 30 tokens</Text>
+          <Switch
+            testID="generation-max-tokens-toggle"
+            accessibilityLabel="Cap at 30 tokens"
+            value={capTokens}
+            onValueChange={setCapTokens}
+          />
+        </View>
+      </View>
+    </WeatherDemo>
   )
 }
+
+const styles = StyleSheet.create({
+  card: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    padding: 16,
+  },
+  cardLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.6,
+    marginBottom: 4,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+    backgroundColor: 'transparent',
+  },
+  rowLabel: {
+    fontSize: 15,
+  },
+})
