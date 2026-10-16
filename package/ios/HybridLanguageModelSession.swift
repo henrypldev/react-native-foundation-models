@@ -42,15 +42,16 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
             }
         }
         
+        let toolSummaries = jsTools.map { (name: $0.name, description: $0.description) }
         let session: LanguageModelSession
         let baseInstructions: String
         if let transcript = config.transcript {
             let decoded = try TranscriptCoding.decode(transcript)
             session = LanguageModelSession(model: model, tools: tools, transcript: decoded)
-            baseInstructions = TranscriptCoding.instructionsText(in: decoded)
-                ?? Self.buildEnhancedInstructions(baseInstructions: nil, tools: jsTools)
+            let restoredBase = TranscriptCoding.instructionsText(in: decoded).map(SessionInstructions.base(of:))
+            baseInstructions = SessionInstructions.compose(base: restoredBase, tools: toolSummaries)
         } else {
-            baseInstructions = Self.buildEnhancedInstructions(baseInstructions: config.instructions, tools: jsTools)
+            baseInstructions = SessionInstructions.compose(base: config.instructions, tools: toolSummaries)
             session = LanguageModelSession(model: model, tools: tools, instructions: baseInstructions)
         }
         self.model = model
@@ -168,7 +169,7 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
         return LanguageModelSession(
             model: self.model,
             tools: self.tools,
-            instructions: "\(baseInstructions)\n\nPrevious conversation summary: \(summaryResponse.content)"
+            instructions: SessionInstructions.withSummary(baseInstructions, summary: summaryResponse.content)
         )
     }
 
@@ -229,20 +230,4 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
     private func endResponse() {
         state.withLock { $0.isResponding = false }
     }
-
-    @available(iOS 26.0, *)
-    private static func buildEnhancedInstructions(baseInstructions: String?, tools: [ToolDefinition]) -> String {
-        let base = baseInstructions ?? "You are a helpful assistant"
-        
-        guard !tools.isEmpty else {
-            return base
-        }
-        
-        let toolDescriptions = tools.map { tool in
-            "- \(tool.name): \(tool.description)"
-        }.joined(separator: "\n")
-        
-        return "\(base). You have access to these tools:\n\(toolDescriptions)"
-    }
 }
-
