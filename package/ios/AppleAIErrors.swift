@@ -1,7 +1,6 @@
 import Foundation
 
 public enum AppleAIError: Error, LocalizedError, CustomStringConvertible {
-    case sessionNotInitialized
     case sessionBusy
     case modelUnavailable(String)
     case toolCallError(Error)
@@ -18,11 +17,11 @@ public enum AppleAIError: Error, LocalizedError, CustomStringConvertible {
     case unsupportedPlatform(String)
     case tokenCountError(Error)
     case invalidGenerationOptions(String)
+    case invalidTranscript(String)
+    case transcriptEncodingError(Error)
     
     public var errorDescription: String? {
         switch self {
-        case .sessionNotInitialized:
-            return "Language model session is not initialized"
         case .sessionBusy:
             return "Another language model request is already in progress for this session"
         case .modelUnavailable(let reason):
@@ -55,6 +54,10 @@ public enum AppleAIError: Error, LocalizedError, CustomStringConvertible {
             return "Token count failed: \(error.localizedDescription)"
         case .invalidGenerationOptions(let details):
             return "Invalid generation options: \(details)"
+        case .invalidTranscript(let details):
+            return "Invalid transcript: \(details)"
+        case .transcriptEncodingError(let error):
+            return "Failed to encode transcript: \(error.localizedDescription)"
         }
     }
     
@@ -64,8 +67,6 @@ public enum AppleAIError: Error, LocalizedError, CustomStringConvertible {
     
     public var code: String {
         switch self {
-        case .sessionNotInitialized:
-            return "SESSION_NOT_INITIALIZED"
         case .sessionBusy:
             return "SESSION_BUSY"
         case .modelUnavailable:
@@ -98,6 +99,10 @@ public enum AppleAIError: Error, LocalizedError, CustomStringConvertible {
             return "TOKEN_COUNT_ERROR"
         case .invalidGenerationOptions:
             return "INVALID_GENERATION_OPTIONS"
+        case .invalidTranscript:
+            return "INVALID_TRANSCRIPT"
+        case .transcriptEncodingError:
+            return "TRANSCRIPT_ENCODING_ERROR"
         }
     }
 }

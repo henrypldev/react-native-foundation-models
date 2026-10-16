@@ -92,3 +92,17 @@ export interface GenerationOptions {
    */
   toolCallingMode?: ToolCallingMode
 }
+
+declare const serializedTranscriptBrand: unique symbol
+
+/**
+ * A session transcript in Apple's `Transcript` JSON format.
+ *
+ * The format belongs to Apple and can change between OS versions. The only
+ * promise is that a value read from `session.transcript` restores through
+ * `new LanguageModelSession({ transcript })`. Do not build or edit one by hand.
+ * A value read back from storage needs a cast: `stored as SerializedTranscript`.
+ */
+export type SerializedTranscript = string & {
+  readonly [serializedTranscriptBrand]: 'SerializedTranscript'
+}

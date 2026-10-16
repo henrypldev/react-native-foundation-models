@@ -18,7 +18,7 @@ public extension LanguageModelSessionConfig {
   /**
    * Create a new instance of `LanguageModelSessionConfig`.
    */
-  init(instructions: String?, tools: [ToolDefinition]?, useCase: String?, guardrails: String?) {
+  init(instructions: String?, tools: [ToolDefinition]?, useCase: String?, guardrails: String?, transcript: String?) {
     self.init({ () -> bridge.std__optional_std__string_ in
       if let __unwrappedValue = instructions {
         return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
@@ -45,6 +45,12 @@ public extension LanguageModelSessionConfig {
       }
     }(), { () -> bridge.std__optional_std__string_ in
       if let __unwrappedValue = guardrails {
+        return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
+      } else {
+        return .init()
+      }
+    }(), { () -> bridge.std__optional_std__string_ in
+      if let __unwrappedValue = transcript {
         return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
       } else {
         return .init()
@@ -93,6 +99,18 @@ public extension LanguageModelSessionConfig {
     return { () -> String? in
       if bridge.has_value_std__optional_std__string_(self.__guardrails) {
         let __unwrapped = bridge.get_std__optional_std__string_(self.__guardrails)
+        return String(__unwrapped)
+      } else {
+        return nil
+      }
+    }()
+  }
+  
+  @inline(__always)
+  var transcript: String? {
+    return { () -> String? in
+      if bridge.has_value_std__optional_std__string_(self.__transcript) {
+        let __unwrapped = bridge.get_std__optional_std__string_(self.__transcript)
         return String(__unwrapped)
       } else {
         return nil

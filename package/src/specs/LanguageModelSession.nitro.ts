@@ -12,6 +12,7 @@ export interface LanguageModelSessionConfig {
   tools?: Array<ToolDefinition>
   useCase?: string
   guardrails?: string
+  transcript?: string
 }
 
 export type NativeSamplingMode = 'greedy' | 'randomTopK' | 'randomProbabilityThreshold'
@@ -41,6 +42,8 @@ export interface LanguageModelSession extends HybridObject<{ ios: 'swift' }> {
     options?: NativeGenerationOptions,
   ): Promise<string>
   tokenCount(prompt: string): Promise<number>
+  serializeTranscript(): string
+  prewarm(promptPrefix?: string): void
   readonly wasContextReset: boolean
 }
 
