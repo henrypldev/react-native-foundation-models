@@ -72,7 +72,7 @@ export type ToolCallingMode = 'allowed' | 'required' | 'disallowed'
  */
 export interface GenerationOptions {
   /**
-   * Controls how random the output is. A finite number of 0 or more.
+   * Controls how random the output is. A number from 0 to 1 inclusive.
    * Lower values give more predictable output.
    */
   temperature?: number

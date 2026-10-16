@@ -31,7 +31,7 @@ const samplingMode = z.discriminatedUnion('kind', [
 
 const generationOptions = z
   .object({
-    temperature: z.number().min(0).optional(),
+    temperature: z.number().min(0).max(1).optional(),
     maximumResponseTokens: z.int().positive().optional(),
     samplingMode: samplingMode.optional(),
     toolCallingMode: z.enum(['allowed', 'required', 'disallowed']).optional(),

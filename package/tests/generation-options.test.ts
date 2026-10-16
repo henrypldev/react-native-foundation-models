@@ -82,6 +82,7 @@ describe('toNativeGenerationOptions', () => {
         samplingMode: { kind: 'randomProbabilityThreshold', probabilityThreshold: 1 },
       })?.samplingProbabilityThreshold,
     ).toBe(1)
+    expect(toNativeGenerationOptions({ temperature: 1 })?.temperature).toBe(1)
   })
 
   test.each([
@@ -89,6 +90,7 @@ describe('toNativeGenerationOptions', () => {
     ['options', null],
     ['options', []],
     ['temperature', { temperature: -0.1 }],
+    ['temperature', { temperature: 1.01 }],
     ['temperature', { temperature: Number.NaN }],
     ['temperature', { temperature: Number.POSITIVE_INFINITY }],
     ['temperature', { temperature: '0.5' }],

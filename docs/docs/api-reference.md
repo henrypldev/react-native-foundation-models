@@ -202,7 +202,7 @@ type SamplingMode =
 type ToolCallingMode = 'allowed' | 'required' | 'disallowed';
 ```
 
-- `temperature` - A finite number of 0 or more. Lower values give more predictable output.
+- `temperature` - A number from 0 to 1 inclusive. Lower values give more predictable output.
 - `maximumResponseTokens` - A positive integer. The response stops at this many tokens. In a session with tools, a very small value (for example 5) can reject with `DECODING_FAILURE`.
 - `samplingMode` - How the model picks each token. `greedy` always picks the most likely token. `randomTopK` samples from the `top` most likely tokens (`top` is an integer of 1 or more). `randomProbabilityThreshold` samples from the smallest set of tokens whose probabilities add up to `probabilityThreshold` (greater than 0, at most 1). `seed` is an optional non-negative integer that makes random sampling repeatable.
 - `toolCallingMode` - Whether the model may (`allowed`), must (`required`), or must not (`disallowed`) call tools. iOS 27 and later only. iOS 26 ignores it. With `required`, the model calls a tool at every step. On the iOS 27.0 simulator it kept calling the tool and the request did not end normally, so prefer `allowed` unless your tool loop has an exit.
