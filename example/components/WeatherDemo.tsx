@@ -1,5 +1,5 @@
 import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect'
-import { type ReactNode, useCallback, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { Card, CardLabel } from '@/components/Card'
 import { ContextMeter } from '@/components/ContextMeter'
 import { Text, useThemeColor, View } from '@/components/Themed'
 import { useKeyboardLift } from '@/components/useKeyboardLift'
@@ -32,7 +33,6 @@ interface WeatherDemoProps {
   metrics?: UsageMetrics
   title?: string
   subtitle?: string
-  children?: ReactNode
 }
 
 const glassAvailable = isLiquidGlassAvailable()
@@ -48,7 +48,6 @@ export function WeatherDemo({
   metrics,
   title = 'Foundation Models',
   subtitle = 'On-device weather tool demo',
-  children,
 }: WeatherDemoProps) {
   const [prompt, setPrompt] = useState('')
   const insets = useSafeAreaInsets()
@@ -61,6 +60,7 @@ export function WeatherDemo({
   const cardColor = useThemeColor({}, 'card')
   const tintColor = useThemeColor({}, 'tint')
   const warnColor = useThemeColor({}, 'warn')
+  const tokens = metrics?.tokens
 
   const respond = useCallback(async () => {
     const nextPrompt = prompt.trim()
@@ -99,42 +99,32 @@ export function WeatherDemo({
         </Text>
         <Text style={styles.title}>{title}</Text>
 
-        <View style={[styles.card, { borderColor, backgroundColor: cardColor }]}>
-          <Text style={[styles.cardLabel, { color: mutedColor }]}>LATEST RESPONSE</Text>
+        <Card>
+          <CardLabel>LATEST RESPONSE</CardLabel>
           <Text style={[styles.response, !response && { color: mutedColor }]}>
             {response || 'Ask about the weather to start a session.'}
           </Text>
-        </View>
+        </Card>
 
-        {children}
+        <Card>
+          <CardLabel>SESSION USAGE</CardLabel>
 
-        <View style={[styles.card, { borderColor, backgroundColor: cardColor }]}>
-          <Text style={[styles.cardLabel, { color: mutedColor }]}>SESSION USAGE</Text>
-
-          <ContextMeter
-            used={metrics?.tokens?.totalTokens}
-            total={metrics?.contextSize}
-          />
+          <ContextMeter used={contextFilled(tokens)} total={metrics?.contextSize} />
 
           <PlainView style={[styles.divider, { backgroundColor: borderColor }]} />
 
-          <MetricRow
-            label="Prompt tokens"
-            value={formatNumber(metrics?.tokens?.promptTokens)}
-            mutedColor={mutedColor}
-          />
-          <MetricRow
-            label="Response tokens"
-            value={formatNumber(metrics?.tokens?.responseTokens)}
-            mutedColor={mutedColor}
-          />
-          <MetricRow
-            label="Total tokens"
-            value={formatNumber(metrics?.tokens?.totalTokens)}
-            mutedColor={mutedColor}
-          />
+          <PlainView>
+            {metricRows(tokens).map(row => (
+              <PlainView key={row.label} style={styles.metricRow}>
+                <Text style={[styles.metricLabel, { color: mutedColor }]}>
+                  {row.label}
+                </Text>
+                <Text style={styles.metricValue}>{formatNumber(row.value)}</Text>
+              </PlainView>
+            ))}
+          </PlainView>
 
-          {metrics?.tokens?.estimated === true ? (
+          {tokens?.source === 'estimated' ? (
             <Text style={[styles.footnote, { color: mutedColor }]}>
               Counts are estimated on this SDK build.
             </Text>
@@ -145,7 +135,7 @@ export function WeatherDemo({
               Context reached the limit, so it was summarised and reset.
             </Text>
           ) : null}
-        </View>
+        </Card>
       </ScrollView>
 
       <PlainView
@@ -208,21 +198,33 @@ export function WeatherDemo({
   )
 }
 
-function MetricRow({
-  label,
-  value,
-  mutedColor,
-}: {
-  label: string
-  value: string
-  mutedColor: string
-}) {
-  return (
-    <PlainView style={styles.metricRow}>
-      <Text style={[styles.metricLabel, { color: mutedColor }]}>{label}</Text>
-      <Text style={styles.metricValue}>{value}</Text>
-    </PlainView>
-  )
+function contextFilled(tokens?: TokenMetrics) {
+  return tokens?.source === 'usage' ? tokens.last.totalTokens : undefined
+}
+
+function metricRows(tokens?: TokenMetrics): Array<{ label: string; value: number }> {
+  switch (tokens?.source) {
+    case undefined:
+      return []
+    case 'usage': {
+      const rows = [
+        { label: 'Conversation input tokens', value: tokens.last.inputTokens },
+        { label: 'Cached input tokens', value: tokens.last.cachedInputTokens },
+        { label: 'Output tokens', value: tokens.last.outputTokens },
+        { label: 'Reasoning tokens', value: tokens.last.reasoningTokens },
+        { label: 'Context filled', value: tokens.last.totalTokens },
+      ]
+      return tokens.sessionTotal === undefined
+        ? rows
+        : [...rows, { label: 'Session total', value: tokens.sessionTotal }]
+    }
+    case 'counted':
+    case 'estimated':
+      return [
+        { label: 'Prompt tokens', value: tokens.promptTokens },
+        { label: 'Response tokens', value: tokens.responseTokens },
+      ]
+  }
 }
 
 const styles = StyleSheet.create({
@@ -248,25 +250,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.37,
     marginTop: -8,
   },
-  card: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 16,
-    padding: 16,
-  },
-  cardLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.6,
-    marginBottom: 12,
-  },
   response: {
     fontSize: 17,
     lineHeight: 24,
   },
   divider: {
     height: StyleSheet.hairlineWidth,
-    marginTop: 16,
-    marginBottom: 4,
+    marginTop: 8,
   },
   metricRow: {
     flexDirection: 'row',
@@ -284,7 +274,7 @@ const styles = StyleSheet.create({
   footnote: {
     fontSize: 13,
     lineHeight: 18,
-    marginTop: 12,
+    marginTop: 4,
   },
   inputBar: {
     flexDirection: 'row',

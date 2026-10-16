@@ -70,6 +70,16 @@ class HybridLanguageModelSessionFactory: HybridLanguageModelSessionFactorySpec {
         return nil
     }
 
+    var modelVariant: String? {
+        guard #available(iOS 26.0, *) else { return nil }
+        return SystemLanguageModel.default.variantDisplayName
+    }
+
+    var modelCapabilities: [NativeModelCapability]? {
+        guard #available(iOS 26.0, *) else { return nil }
+        return SystemLanguageModel.default.nativeCapabilities
+    }
+
     @available(iOS 26.0, *)
     private static func makeModel(
         useCase: String?,

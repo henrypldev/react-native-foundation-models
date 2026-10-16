@@ -24,6 +24,7 @@ import type {
   SerializedTranscript,
   SystemLanguageModelGuardrails,
   SystemLanguageModelUseCase,
+  TokenUsage,
 } from './types'
 
 const LanguageModelSessionFactory =
@@ -75,26 +76,19 @@ export type LanguageModelSessionOptions = {
   | { transcript: SerializedTranscript; instructions?: never }
 )
 
-/**
- * Gets a human-readable message for the availability status
- */
-function getAvailabilityMessage(status: AvailabilityStatus): string {
-  switch (status) {
-    case 'available':
-      return 'Foundation Models is available and ready to use'
-    case 'unavailable.platformNotSupported':
-      return 'Foundation Models requires iOS 26.0 or later'
-    case 'unavailable.deviceNotEligible':
-      return 'This device does not support Apple Intelligence'
-    case 'unavailable.appleIntelligenceNotEnabled':
-      return 'Apple Intelligence is not enabled in Settings'
-    case 'unavailable.modelNotReady':
-      return 'The model is downloading or not ready for other system reasons'
-    case 'unavailable.unknown':
-      return 'Foundation Models is unavailable for an unknown reason'
-    default:
-      return 'Foundation Models availability status is unknown'
-  }
+const availabilityMessages: Record<AvailabilityStatus, string> = {
+  available: 'Foundation Models is available and ready to use',
+  'unavailable.platformNotSupported': 'Foundation Models requires iOS 26.0 or later',
+  'unavailable.deviceNotEligible': 'This device does not support Apple Intelligence',
+  'unavailable.appleIntelligenceNotEnabled':
+    'Apple Intelligence is not enabled in Settings',
+  'unavailable.modelNotReady':
+    'The model is downloading or not ready for other system reasons',
+  'unavailable.unknown': 'Foundation Models is unavailable for an unknown reason',
+}
+
+function isAvailabilityStatus(value: string): value is AvailabilityStatus {
+  return Object.hasOwn(availabilityMessages, value)
 }
 
 function parseIOSVersion(versionValue: string | number): {
@@ -112,6 +106,11 @@ function parseIOSVersion(versionValue: string | number): {
   }
 }
 
+/**
+ * @deprecated Guessed from the iOS version, and returns `'26.4+'` for every
+ * iOS 27 model. On iOS 27 and later, read `variant` from
+ * `checkFoundationModelsAvailability()` instead.
+ */
 export function getFoundationModelsModelFamily():
   | FoundationModelsModelFamily
   | undefined {
@@ -153,23 +152,25 @@ export function getFoundationModelsContextSize(): number | undefined {
 export function checkFoundationModelsAvailability(): FoundationModelsAvailability {
   try {
     const isAvailable = LanguageModelSessionFactory.isAvailable
-    const statusString = LanguageModelSessionFactory.availabilityStatus
-    const status = statusString.startsWith('unavailable.unknown(')
-      ? ('unavailable.unknown' as const)
-      : (statusString as AvailabilityStatus)
+    const nativeStatus = LanguageModelSessionFactory.availabilityStatus
+    const status = isAvailabilityStatus(nativeStatus)
+      ? nativeStatus
+      : 'unavailable.unknown'
 
     return {
       isAvailable,
       status,
-      message: getAvailabilityMessage(status),
+      message: availabilityMessages[status],
       contextSize: getFoundationModelsContextSize(),
       modelFamily: getFoundationModelsModelFamily(),
+      variant: LanguageModelSessionFactory.modelVariant,
+      capabilities: LanguageModelSessionFactory.modelCapabilities,
     }
   } catch (_error) {
     return {
       isAvailable: false,
       status: 'unavailable.platformNotSupported',
-      message: getAvailabilityMessage('unavailable.platformNotSupported'),
+      message: availabilityMessages['unavailable.platformNotSupported'],
       contextSize: getFoundationModelsContextSize(),
       modelFamily: getFoundationModelsModelFamily(),
     }
@@ -403,6 +404,37 @@ export class LanguageModelSession {
   }
 
   /**
+   * Tokens used by every completed request in this session. iOS 27 and later
+   * only. `undefined` on iOS 26.
+   *
+   * The count includes the summary request of a context overflow reset. A
+   * session restored from a transcript starts again from zero.
+   *
+   * @example
+   * ```typescript
+   * await session.respond('Plan a 3 day trip')
+   * session.usage?.totalTokens
+   * ```
+   */
+  get usage(): TokenUsage | undefined {
+    return this.session.usage
+  }
+
+  /**
+   * Tokens used by the latest `respond` or `streamResponse` call. iOS 27 and
+   * later only. `undefined` on iOS 26, before the first request, and after a
+   * request that failed.
+   *
+   * `inputTokens` covers the whole conversation the model read, so
+   * `inputTokens + outputTokens` is how much of the context window the
+   * session now fills. When the model calls tools, this counts only the
+   * final pass that wrote the answer. `usage` counts every pass.
+   */
+  get lastResponseUsage(): TokenUsage | undefined {
+    return this.session.lastResponseUsage
+  }
+
+  /**
    * The session's conversation so far, including its instructions. Pass it to
    * `new LanguageModelSession({ transcript })` to continue the conversation in
    * a new session, for example after the app restarts.
@@ -445,7 +477,10 @@ export class LanguageModelSession {
     try {
       this.session.prewarm(promptPrefix)
     } catch (error) {
-      throw parseNativeError(error, { operation: 'prewarm' })
+      throw parseNativeError(error, {
+        fallbackCode: 'PREWARM_ERROR',
+        operation: 'prewarm',
+      })
     }
   }
 }

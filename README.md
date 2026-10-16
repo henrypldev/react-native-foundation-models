@@ -1,168 +1,104 @@
 # react-native-foundation-models
 
-React Native Nitro module for Apple's Foundation Models (Apple Intelligence). Enables AI capabilities in React Native applications using Apple's on-device model, with tool calling support and streaming responses on iOS 26.0+.
+React Native access to Apple's on-device Foundation Models (Apple Intelligence) on iOS 26 and later. It supports streaming, tool calling, structured output from Zod schemas, per-request generation options, transcripts, and token usage.
+
+The full API, every option, and every error code are in the [API reference](https://github.com/henrypldev/react-native-foundation-models/blob/main/docs/docs/api-reference.md).
 
 ## Requirements
 
-- iOS 26.0 or later
-- Apple Intelligence enabled in Settings > Apple Intelligence & Siri
-- Compatible Apple devices (Apple Silicon Macs, recent iPhones/iPads)
-- React Native with Nitro modules support
+- iOS 26.0 or later. Token usage, `toolCallingMode`, `reasoningLevel`, and model info need iOS 27.
+- Apple Intelligence enabled in Settings > Apple Intelligence & Siri, on a device that supports it.
+- `react-native-nitro-modules`.
 
 ## Installation
 
 ```sh
-npm install react-native-foundation-models react-native-nitro-modules
-yarn add react-native-foundation-models react-native-nitro-modules
 bun add react-native-foundation-models react-native-nitro-modules
 ```
 
-## Usage
+## Quickstart
 
-### Basic Chat Session
+### Check availability
+
+```typescript
+import { checkFoundationModelsAvailability } from 'react-native-foundation-models';
+
+const { isAvailable, message, variant, capabilities } = checkFoundationModelsAvailability();
+```
+
+`variant` and `capabilities` describe the on-device model on iOS 27 and later.
+
+### Respond and stream
 
 ```typescript
 import { LanguageModelSession } from 'react-native-foundation-models';
 
-const session = new LanguageModelSession({
-  instructions: 'You are a helpful assistant',
-  useCase: 'general',
-  guardrails: 'default',
-});
+const session = new LanguageModelSession({ instructions: 'You are a helpful assistant' });
 
-// Stream responses
-await session.streamResponse('Hello, how are you?', (response) => {
-  console.log('Streaming response:', response);
-});
+const answer = await session.respond('Name a color', { samplingMode: { kind: 'greedy' } });
+
+await session.streamResponse('Write a haiku', (textSoFar) => setText(textSoFar));
 ```
 
-### Using React Hooks
+### Structured output
+
+```typescript
+import { z } from 'zod';
+
+const Recipe = z.object({ title: z.string(), ingredients: z.array(z.string()) });
+
+const recipe = await session.respond('A quick pasta recipe', { schema: Recipe });
+```
+
+### Tools
+
+```typescript
+import { createTool } from 'react-native-foundation-models';
+
+const weatherTool = createTool({
+  name: 'weather_tool',
+  description: 'Get the current weather for a city',
+  arguments: z.object({ city: z.string() }),
+  handler: async ({ city }) => fetchWeather(city),
+});
+
+const weatherSession = new LanguageModelSession({ tools: [weatherTool] });
+```
+
+### Transcripts and token usage
+
+```typescript
+const saved = session.transcript;
+const restored = new LanguageModelSession({ transcript: saved, tools: [weatherTool] });
+
+await restored.respond('What did we talk about?');
+restored.lastResponseUsage?.totalTokens;
+restored.usage?.totalTokens;
+```
+
+A session starts from `instructions` or from a `transcript`, not both.
+
+### React hook
 
 ```typescript
 import { useLanguageModel } from 'react-native-foundation-models';
 
-function ChatComponent() {
-  const { send, response, loading, error, isSessionReady } = useLanguageModel({
-    instructions: 'You are a helpful coding assistant',
-    onResponse: (response) => console.log('Got response:', response),
-    onError: (error) => console.error('Error:', error)
-  });
-
-  const handleSendMessage = async () => {
-    if (isSessionReady) {
-      await send('Explain React hooks');
-    }
-  };
-
-  return (
-    <View>
-      <Text>{response}</Text>
-      <Button onPress={handleSendMessage} disabled={loading} title="Send" />
-    </View>
-  );
-}
+const { send, response, loading } = useLanguageModel({ instructions: 'You are a helpful assistant' });
 ```
 
-### Tool calling
+### Errors
 
-```typescript
-import { createTool, LanguageModelSession } from 'react-native-foundation-models';
-import { z } from 'zod';
-
-const weatherTool = createTool({
-  name: 'weather_tool',
-  description: 'Get current weather for a city',
-  arguments: z.object({
-    city: z.string(),
-  }),
-  handler: async (args) => {
-    const response = await fetch(`/weather?city=${args.city}`);
-    const res = await response.json();
-    return res.data
-  },
-});
-
-const session = new LanguageModelSession({
-  instructions: 'You are a weather assistant',
-  tools: [weatherTool]
-});
-```
-
-## API Reference
-
-### `LanguageModelSession`
-
-Core class for managing AI conversations.
-
-```typescript
-constructor(config?: {
-  instructions?: string;
-  tools?: Tool[];
-  useCase?: 'general' | 'contentTagging';
-  guardrails?: 'default' | 'permissiveContentTransformations';
-})
-```
-
-The library now creates sessions with an explicit `SystemLanguageModel`, which lets you opt into Foundation Models use cases and guardrails from React Native.
-
-### `useLanguageModel(config)`
-
-React hook for session management with automatic lifecycle handling.
-
-Returns:
-- `session` - The current session instance
-- `response` - Latest AI response
-- `loading` - Whether a request is in progress
-- `error` - Any error that occurred
-- `send(prompt)` - Send a message to the AI
-- `reset()` - Reset the conversation state
-- `isSessionReady` - Whether the session is ready to use
-
-### `useStreamingResponse(session)`
-
-Lower-level hook for streaming responses.
-
-### `checkFoundationModelsAvailability()`
-
-Check if Apple Intelligence is available on the device.
-
-The returned object also includes:
-
-- `contextSize`: current library context budget in tokens
-- `modelFamily`: `'26.0-26.3'` or `'26.4+'` based on the OS version
-
-### `getFoundationModelsModelFamily()`
-
-Returns the Foundation Models family for the current OS version: `'26.0-26.3'` or `'26.4+'`.
-
-### `getFoundationModelsContextSize()`
-
-Returns the library's current context budget in tokens. Apple documents a 4,096-token context window for the on-device model in iOS 26.0 through 26.3, so the library currently surfaces that value until it can be wired to the native `SystemLanguageModel.contextSize` API with an iOS 26.4 SDK.
-
-## Foundation Models 26.4 Notes
-
-- Apple’s current docs split the on-device model into two version families: `26.0-26.3` and `26.4+`. The library exposes this as `modelFamily` so apps can version prompts when model behavior changes.
-- Exact native token measurement with `SystemLanguageModel.tokenCount(for:)` is not compiled into this branch yet because the installed Xcode SDK here is `iPhoneOS26.2`, which does not expose that symbol. Once the project moves to an SDK that includes the 26.4 APIs, the JS surface can adopt the native token counter without another breaking API change.
+Every failure is an `AppleAIError` with a stable `code`, such as `CONTEXT_EXCEEDED` or `INVALID_GENERATION_OPTIONS`. The API reference lists every code.
 
 ## Development
 
-This project uses a workspace structure with:
-- `package/` - The nitro module source code
-- `example/` - Example app demonstrating usage
-
-### Setup
+- `package/` holds the Nitro module.
+- `example/` holds an Expo app with one screen per feature.
 
 ```sh
 bun install
 bun run build
+cd example && bun ios
 ```
 
-### Running the example
-
-```sh
-cd example
-bun start    # Start Expo dev server
-bun ios      # Run on iOS
-```
-
-Note: Android is not supported as this module requires Apple's Foundation Models framework.
+Android is not supported, because the module needs Apple's Foundation Models framework.

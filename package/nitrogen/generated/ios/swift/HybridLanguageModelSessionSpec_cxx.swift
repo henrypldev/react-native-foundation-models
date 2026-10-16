@@ -127,6 +127,32 @@ open class HybridLanguageModelSessionSpec_cxx {
       return self.__implementation.wasContextReset
     }
   }
+  
+  public final var usage: bridge.std__optional_NativeTokenUsage_ {
+    @inline(__always)
+    get {
+      return { () -> bridge.std__optional_NativeTokenUsage_ in
+        if let __unwrappedValue = self.__implementation.usage {
+          return bridge.create_std__optional_NativeTokenUsage_(__unwrappedValue)
+        } else {
+          return .init()
+        }
+      }()
+    }
+  }
+  
+  public final var lastResponseUsage: bridge.std__optional_NativeTokenUsage_ {
+    @inline(__always)
+    get {
+      return { () -> bridge.std__optional_NativeTokenUsage_ in
+        if let __unwrappedValue = self.__implementation.lastResponseUsage {
+          return bridge.create_std__optional_NativeTokenUsage_(__unwrappedValue)
+        } else {
+          return .init()
+        }
+      }()
+    }
+  }
 
   // Methods
   @inline(__always)

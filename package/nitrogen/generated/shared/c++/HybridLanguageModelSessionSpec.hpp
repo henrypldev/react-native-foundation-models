@@ -13,13 +13,16 @@
 #error NitroModules cannot be found! Are you sure you installed NitroModules properly?
 #endif
 
+// Forward declaration of `NativeTokenUsage` to properly resolve imports.
+namespace margelo::nitro::rnfoundationmodels { struct NativeTokenUsage; }
 // Forward declaration of `NativeGenerationOptions` to properly resolve imports.
 namespace margelo::nitro::rnfoundationmodels { struct NativeGenerationOptions; }
 
+#include "NativeTokenUsage.hpp"
+#include <optional>
 #include <string>
 #include <NitroModules/Promise.hpp>
 #include <NitroModules/AnyMap.hpp>
-#include <optional>
 #include "NativeGenerationOptions.hpp"
 #include <functional>
 
@@ -51,6 +54,8 @@ namespace margelo::nitro::rnfoundationmodels {
     public:
       // Properties
       virtual bool getWasContextReset() = 0;
+      virtual std::optional<NativeTokenUsage> getUsage() = 0;
+      virtual std::optional<NativeTokenUsage> getLastResponseUsage() = 0;
 
     public:
       // Methods

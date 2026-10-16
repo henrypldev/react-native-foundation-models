@@ -42,8 +42,9 @@ import { checkFoundationModelsAvailability } from 'react-native-foundation-model
 const availability = checkFoundationModelsAvailability();
 console.log(availability.status); // 'available' or 'unavailable.xxx'
 console.log(availability.message); // Human-readable message
-console.log(availability.modelFamily); // '26.0-26.3' or '26.4+'
-console.log(availability.contextSize); // Native context size on iOS 26.4+, undefined otherwise
+console.log(availability.contextSize); // Context window in tokens on iOS 26.4+, undefined otherwise
+console.log(availability.variant); // Model name on iOS 27+, such as 'AFM 3 Core'
+console.log(availability.capabilities); // Model features on iOS 27+, such as ['guidedGeneration', 'toolCalling']
 ```
 
 ### Availability States
@@ -59,8 +60,9 @@ console.log(availability.contextSize); // Native context size on iOS 26.4+, unde
 
 The library also exposes:
 
-- The current model family via `modelFamily`, which helps you version prompts across Apple’s `26.0-26.3` and `26.4+` model families
-- The current context budget via `contextSize`
+- The model name via `variant` and its features via `capabilities`, on iOS 27 and later. Check `capabilities` before you use a feature that not every model has, such as `reasoningLevel`
+- The context window size via `contextSize`, on iOS 26.4 and later
+- `modelFamily`, which is deprecated. It is guessed from the iOS version and reports `'26.4+'` for every iOS 27 model
 
 ## Tool Calling
 

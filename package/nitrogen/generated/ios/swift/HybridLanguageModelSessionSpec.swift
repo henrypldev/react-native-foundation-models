@@ -11,6 +11,8 @@ import NitroModules
 public protocol HybridLanguageModelSessionSpec_protocol: HybridObject {
   // Properties
   var wasContextReset: Bool { get }
+  var usage: NativeTokenUsage? { get }
+  var lastResponseUsage: NativeTokenUsage? { get }
 
   // Methods
   func respond(prompt: String, schema: AnyMap?, options: NativeGenerationOptions?) throws -> Promise<String>

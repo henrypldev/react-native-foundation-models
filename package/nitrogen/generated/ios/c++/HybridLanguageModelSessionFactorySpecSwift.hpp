@@ -12,6 +12,8 @@
 // Forward declaration of `HybridLanguageModelSessionFactorySpec_cxx` to properly resolve imports.
 namespace RNFoundationModels { class HybridLanguageModelSessionFactorySpec_cxx; }
 
+// Forward declaration of `NativeModelCapability` to properly resolve imports.
+namespace margelo::nitro::rnfoundationmodels { enum class NativeModelCapability; }
 // Forward declaration of `HybridLanguageModelSessionSpec` to properly resolve imports.
 namespace margelo::nitro::rnfoundationmodels { class HybridLanguageModelSessionSpec; }
 // Forward declaration of `LanguageModelSessionConfig` to properly resolve imports.
@@ -21,11 +23,12 @@ namespace margelo::nitro::rnfoundationmodels { struct ToolDefinition; }
 
 #include <string>
 #include <optional>
+#include "NativeModelCapability.hpp"
+#include <vector>
 #include <memory>
 #include "HybridLanguageModelSessionSpec.hpp"
 #include "LanguageModelSessionConfig.hpp"
 #include "ToolDefinition.hpp"
-#include <vector>
 #include <NitroModules/AnyMap.hpp>
 #include <NitroModules/Promise.hpp>
 #include <functional>
@@ -85,6 +88,14 @@ namespace margelo::nitro::rnfoundationmodels {
     }
     inline std::optional<double> getContextSize() noexcept override {
       auto __result = _swiftPart.getContextSize();
+      return __result;
+    }
+    inline std::optional<std::string> getModelVariant() noexcept override {
+      auto __result = _swiftPart.getModelVariant();
+      return __result;
+    }
+    inline std::optional<std::vector<NativeModelCapability>> getModelCapabilities() noexcept override {
+      auto __result = _swiftPart.getModelCapabilities();
       return __result;
     }
 

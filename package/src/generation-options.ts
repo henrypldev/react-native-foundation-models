@@ -35,6 +35,7 @@ const generationOptions = z
     maximumResponseTokens: z.int().positive().optional(),
     samplingMode: samplingMode.optional(),
     toolCallingMode: z.enum(['allowed', 'required', 'disallowed']).optional(),
+    reasoningLevel: z.enum(['light', 'moderate', 'deep']).optional(),
   })
   .transform(({ samplingMode, ...rest }) => ({
     ...rest,

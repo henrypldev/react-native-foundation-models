@@ -6,23 +6,26 @@ import type {
   LanguageModelSessionFactory,
   LanguageModelSession as LanguageModelSessionSpec,
 } from '../src/specs/LanguageModelSession.nitro'
-import type { SerializedTranscript } from '../src/types'
+import type { AvailabilityStatus, SerializedTranscript } from '../src/types'
 
 type NativeSession = Omit<LanguageModelSessionSpec, keyof HybridObject<{ ios: 'swift' }>>
 
 let nativeSession: NativeSession
 let createSession: (config: LanguageModelSessionConfig) => NativeSession
 
-const factory = {
+type Mutable<T> = { -readonly [Key in keyof T]: T[Key] }
+
+type NativeFactory = Mutable<
+  Omit<LanguageModelSessionFactory, keyof HybridObject<{ ios: 'swift' }> | 'create'>
+> & {
+  create: (config: LanguageModelSessionConfig) => NativeSession
+}
+
+const factory: NativeFactory = {
   isAvailable: true,
   availabilityStatus: 'available',
   contextSize: 4096,
   create: (config: LanguageModelSessionConfig) => createSession(config),
-} satisfies Omit<
-  LanguageModelSessionFactory,
-  keyof HybridObject<{ ios: 'swift' }> | 'create'
-> & {
-  create: (config: LanguageModelSessionConfig) => NativeSession
 }
 
 mock.module('react-native-nitro-modules', () => ({
@@ -35,7 +38,9 @@ mock.module('react-native', () => ({
   Platform: { OS: 'ios', Version: '26.4' },
 }))
 
-const { LanguageModelSession } = await import('../src/LanguageModelSession')
+const { LanguageModelSession, checkFoundationModelsAvailability } = await import(
+  '../src/LanguageModelSession'
+)
 
 beforeEach(() => {
   nativeSession = {
@@ -51,6 +56,7 @@ beforeEach(() => {
     wasContextReset: false,
   }
   createSession = () => nativeSession
+  factory.availabilityStatus = 'available'
 })
 
 describe('LanguageModelSession native boundary', () => {
@@ -144,6 +150,7 @@ describe('LanguageModelSession native boundary', () => {
     })
     await session.streamResponse('Hello', onChunk, {
       samplingMode: { kind: 'randomTopK', top: 3, seed: 1 },
+      reasoningLevel: 'moderate',
     })
 
     expect(respond).toHaveBeenCalledWith(
@@ -159,6 +166,7 @@ describe('LanguageModelSession native boundary', () => {
         samplingMode: 'randomTopK',
         samplingTop: 3,
         samplingSeed: 1,
+        reasoningLevel: 'moderate',
       }),
     )
   })
@@ -416,5 +424,34 @@ describe('LanguageModelSession transcript', () => {
         details: expect.objectContaining({ operation: 'transcript' }),
       }),
     )
+  })
+})
+
+describe('LanguageModelSession prewarm', () => {
+  test('maps an opaque native prewarm failure', () => {
+    nativeSession.prewarm = () => {
+      throw new Error('Unknown native C++ error')
+    }
+    const session = new LanguageModelSession()
+
+    expect(() => session.prewarm()).toThrow(
+      expect.objectContaining({
+        code: 'PREWARM_ERROR',
+        details: expect.objectContaining({ operation: 'prewarm' }),
+      }),
+    )
+  })
+})
+
+describe('checkFoundationModelsAvailability', () => {
+  test.each<[string, AvailabilityStatus]>([
+    ['available', 'available'],
+    ['unavailable.modelNotReady', 'unavailable.modelNotReady'],
+    ['unavailable.unknown(someFutureReason)', 'unavailable.unknown'],
+    ['unavailable.somethingNew', 'unavailable.unknown'],
+  ])('parses native status %s as %s', (nativeStatus, status) => {
+    factory.availabilityStatus = nativeStatus
+
+    expect(checkFoundationModelsAvailability().status).toBe(status)
   })
 })
