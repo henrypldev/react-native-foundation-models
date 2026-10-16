@@ -63,6 +63,7 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
     
     @available(iOS 26.0, *)
     func respond(prompt: String, schema: AnyMap?, options: NativeGenerationOptions?) throws -> Promise<String> {
+        state.withLock { $0.usage.beginRequest() }
         guard let document = schema?.schemaDocument() else {
             guard !Self.isBlank(prompt) else { return Promise.resolved(withResult: "") }
             return generate(during: .response, options: options) { session, generationOptions in
@@ -89,6 +90,7 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
         schema: AnyMap?,
         options: NativeGenerationOptions?
     ) throws -> Promise<String> {
+        state.withLock { $0.usage.beginRequest() }
         guard let document = schema?.schemaDocument() else {
             guard !Self.isBlank(prompt) else { return Promise.resolved(withResult: "") }
             return generate(during: .streaming, options: options) { session, generationOptions in
@@ -241,7 +243,6 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
                 throw AppleAIError.sessionBusy
             }
             state.isResponding = true
-            state.usage.beginRequest()
             return state.session
         }
     }
