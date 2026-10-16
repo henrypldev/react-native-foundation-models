@@ -75,11 +75,13 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
                 let result = try await modelSession.respond(to: prompt)
                 return result.content
             } catch {
-                let mapped = mapFoundationModelsError(error, during: .response)
-                if case .contextExceeded = mapped {
+                switch mapFoundationModelsError(error, during: .response) {
+                case .contextOverflow:
                     try await self.recoverFromContextOverflow(previousSession: modelSession)
+                    throw AppleAIError.contextExceeded
+                case .other(let mapped):
+                    throw mapped
                 }
-                throw mapped
             }
         }
     }
@@ -111,11 +113,13 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
                     onContent: onStream
                 )
             } catch {
-                let mapped = mapFoundationModelsError(error, during: .streaming)
-                if case .contextExceeded = mapped {
+                switch mapFoundationModelsError(error, during: .streaming) {
+                case .contextOverflow:
                     try await self.recoverFromContextOverflow(previousSession: modelSession)
+                    throw AppleAIError.contextExceeded
+                case .other(let mapped):
+                    throw mapped
                 }
-                throw mapped
             }
         }
     }
