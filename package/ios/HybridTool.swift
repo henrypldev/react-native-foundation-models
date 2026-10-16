@@ -15,9 +15,7 @@ struct HybridTool: Tool, @unchecked Sendable {
         self.description = description
         self.handler = handler
         do {
-            self.parameters = try ToolSchemaBuilder.schema(
-                fromArguments: Self.schemaDictionary(from: parameters)
-            )
+            self.parameters = try GenerationSchemaBuilder.toolParameters(from: parameters.schemaDocument())
         } catch {
             throw AppleAIError.schemaCreationError("Failed to create schema for tool '\(name)': \(error.localizedDescription)")
         }
@@ -26,7 +24,7 @@ struct HybridTool: Tool, @unchecked Sendable {
     @available(iOS 26.0, *)
     func call(arguments: GeneratedContent) async throws -> some Generable {
         do {
-            let argumentsMap = try Self.anyMap(fromArguments: ToolSchemaBuilder.value(from: arguments))
+            let argumentsMap = try Self.anyMap(fromArguments: ToolContent.arguments(from: arguments))
             let resultPromise = handler(argumentsMap)
 
             let result: Promise<AnyMap>
@@ -43,7 +41,7 @@ struct HybridTool: Tool, @unchecked Sendable {
                 throw AppleAIError.toolExecutionError(name, error)
             }
 
-            return try ToolSchemaBuilder.generatedContent(
+            return try ToolContent.generatedContent(
                 fromResult: Self.resultDictionary(from: resultMap)
             )
         } catch let error as AppleAIError {
@@ -54,15 +52,6 @@ struct HybridTool: Tool, @unchecked Sendable {
     }
 
     // MARK: - AnyMap bridging
-
-    @available(iOS 26.0, *)
-    private static func schemaDictionary(from anyMap: AnyMap) -> [String: Any] {
-        var dictionary: [String: Any] = [:]
-        for key in anyMap.getAllKeys() {
-            dictionary[key] = anyMap.getAny(key: key) ?? NSNull()
-        }
-        return dictionary
-    }
 
     @available(iOS 26.0, *)
     private static func resultDictionary(from anyMap: AnyMap) -> [String: Any?] {

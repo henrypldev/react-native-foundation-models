@@ -64,7 +64,7 @@ export class ToolExecutionError extends AppleAIError {
 
 export class SchemaCreationError extends AppleAIError {
   constructor(message: string, details?: Record<string, any>) {
-    super('SCHEMA_CREATION_ERROR', `Failed to create tool schema: ${message}`, details)
+    super('SCHEMA_CREATION_ERROR', `Failed to create schema: ${message}`, details)
   }
 }
 
@@ -77,6 +77,16 @@ export class ArgumentParsingError extends AppleAIError {
 export class ResponseParsingError extends AppleAIError {
   constructor(message: string, details?: Record<string, any>) {
     super('RESPONSE_PARSING_ERROR', `Failed to parse tool response: ${message}`, details)
+  }
+}
+
+export class ResponseValidationError extends AppleAIError {
+  constructor(message: string, details?: Record<string, any>) {
+    super(
+      'RESPONSE_VALIDATION_ERROR',
+      `Response does not match the schema: ${message}`,
+      details,
+    )
   }
 }
 

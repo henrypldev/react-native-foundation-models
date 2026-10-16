@@ -68,6 +68,36 @@ Fields: `temperature`, `maximumResponseTokens`, `samplingMode` (`greedy`, `rando
 
 In a session with tools, a very small `maximumResponseTokens` (for example 5) can reject with `DECODING_FAILURE`, because the model uses tokens to decide on tool calls before it writes the answer.
 
+### Structured output
+
+Pass a Zod object schema as `schema`. The model can only generate values that fit it, and the promise resolves with the parsed value.
+
+```typescript
+import { z } from 'zod';
+
+const Recipe = z.object({
+  title: z.string(),
+  difficulty: z.enum(['easy', 'medium', 'hard']),
+  ingredients: z.array(z.object({ name: z.string(), quantity: z.string() })),
+  minutes: z.number().int(),
+});
+
+const recipe = await session.respond('A quick pasta recipe', { schema: Recipe });
+// recipe: { title: string; difficulty: 'easy' | 'medium' | 'hard'; ... }
+
+const final = await session.streamResponse(
+  'A quick pasta recipe',
+  (partial) => render(partial),
+  { schema: Recipe },
+);
+```
+
+While the stream runs, `onChunk` receives the object generated so far. Fields appear in the order the model writes them, which is not always the schema order. A string field can be incomplete, and an enum field can be `''` before the model picks a value. Partial objects are not validated. The final value is parsed with the schema.
+
+The schema must have `z.object` at the root and follows the same rules as tool arguments (see `createTool` in the API reference). An unsupported schema rejects with `SCHEMA_CREATION_ERROR` before the request. A final value that does not parse (for example, it fails a `.refine()` check the model cannot see) rejects with `RESPONSE_VALIDATION_ERROR`, and `error.details.issues` holds the Zod issues.
+
+The hooks return text only. Call `session.respond` or `session.streamResponse` directly for structured output.
+
 ### Using React Hooks
 
 ```typescript
@@ -138,8 +168,8 @@ constructor(config?: {
 The library now creates sessions with an explicit `SystemLanguageModel`, which lets you opt into Foundation Models use cases and guardrails from React Native.
 
 Methods:
-- `respond(prompt, options?)` - Generate a complete response and resolve when finished
-- `streamResponse(prompt, onChunk, options?)` - Stream the response progressively
+- `respond(prompt, options?)` - Generate a complete response and resolve when finished. With `options.schema`, resolve with the parsed object
+- `streamResponse(prompt, onChunk, options?)` - Stream the response progressively. With `options.schema`, `onChunk` receives partial objects
 
 ### `useLanguageModel(config)`
 

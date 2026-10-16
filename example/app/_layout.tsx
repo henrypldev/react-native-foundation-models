@@ -33,6 +33,11 @@ export default function RootLayout() {
             <NativeTabs.Trigger.Label>Hook</NativeTabs.Trigger.Label>
           </NativeTabs.Trigger>
 
+          <NativeTabs.Trigger name="structured-demo">
+            <NativeTabs.Trigger.Icon sf="list.bullet.rectangle" />
+            <NativeTabs.Trigger.Label>Structured</NativeTabs.Trigger.Label>
+          </NativeTabs.Trigger>
+
           <NativeTabs.Trigger name="+not-found" hidden />
         </NativeTabs>
       </ThemeProvider>

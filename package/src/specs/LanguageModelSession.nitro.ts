@@ -29,10 +29,15 @@ export interface NativeGenerationOptions {
 }
 
 export interface LanguageModelSession extends HybridObject<{ ios: 'swift' }> {
-  respond(prompt: string, options?: NativeGenerationOptions): Promise<string>
+  respond(
+    prompt: string,
+    schema?: AnyMap,
+    options?: NativeGenerationOptions,
+  ): Promise<string>
   streamResponse(
     prompt: string,
     onStream: (stream: string) => void,
+    schema?: AnyMap,
     options?: NativeGenerationOptions,
   ): Promise<string>
   tokenCount(prompt: string): Promise<number>
