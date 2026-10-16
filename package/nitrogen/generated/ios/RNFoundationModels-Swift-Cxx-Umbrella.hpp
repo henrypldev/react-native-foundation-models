@@ -18,6 +18,10 @@ namespace margelo::nitro::rnfoundationmodels { struct LanguageModelSessionConfig
 namespace margelo::nitro::rnfoundationmodels { struct NativeGenerationOptions; }
 // Forward declaration of `NativeModelCapability` to properly resolve imports.
 namespace margelo::nitro::rnfoundationmodels { enum class NativeModelCapability; }
+// Forward declaration of `NativePromptImage` to properly resolve imports.
+namespace margelo::nitro::rnfoundationmodels { struct NativePromptImage; }
+// Forward declaration of `NativePrompt` to properly resolve imports.
+namespace margelo::nitro::rnfoundationmodels { struct NativePrompt; }
 // Forward declaration of `NativeReasoningLevel` to properly resolve imports.
 namespace margelo::nitro::rnfoundationmodels { enum class NativeReasoningLevel; }
 // Forward declaration of `NativeSamplingMode` to properly resolve imports.
@@ -35,6 +39,8 @@ namespace margelo::nitro::rnfoundationmodels { struct ToolDefinition; }
 #include "LanguageModelSessionConfig.hpp"
 #include "NativeGenerationOptions.hpp"
 #include "NativeModelCapability.hpp"
+#include "NativePrompt.hpp"
+#include "NativePromptImage.hpp"
 #include "NativeReasoningLevel.hpp"
 #include "NativeSamplingMode.hpp"
 #include "NativeTokenUsage.hpp"

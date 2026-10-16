@@ -62,16 +62,16 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
     }
     
     @available(iOS 26.0, *)
-    func respond(prompt: String, schema: AnyMap?, options: NativeGenerationOptions?) throws -> Promise<String> {
+    func respond(prompt: NativePrompt, schema: AnyMap?, options: NativeGenerationOptions?) throws -> Promise<String> {
         state.withLock { $0.usage.beginRequest() }
         guard let document = schema?.schemaDocument() else {
-            guard !Self.isBlank(prompt) else { return Promise.resolved(withResult: "") }
-            return generate(during: .response, options: options) { session, generationOptions in
+            guard !Self.isEmpty(prompt) else { return Promise.resolved(withResult: "") }
+            return generate(prompt, during: .response, options: options) { session, prompt, generationOptions in
                 let response = try await session.respond(to: prompt, options: generationOptions, reasoningLevel: options?.reasoningLevel)
                 return (response.content, response.tokenUsage)
             }
         }
-        return generate(during: .response, options: options) { session, generationOptions in
+        return generate(prompt, during: .response, options: options) { session, prompt, generationOptions in
             let generationSchema = try GenerationSchemaBuilder.responseSchema(from: document)
             let response = try await session.respond(
                 to: prompt,
@@ -85,22 +85,22 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
 
     @available(iOS 26.0, *)
     func streamResponse(
-        prompt: String,
+        prompt: NativePrompt,
         onStream: @escaping (String) -> Void,
         schema: AnyMap?,
         options: NativeGenerationOptions?
     ) throws -> Promise<String> {
         state.withLock { $0.usage.beginRequest() }
         guard let document = schema?.schemaDocument() else {
-            guard !Self.isBlank(prompt) else { return Promise.resolved(withResult: "") }
-            return generate(during: .streaming, options: options) { session, generationOptions in
+            guard !Self.isEmpty(prompt) else { return Promise.resolved(withResult: "") }
+            return generate(prompt, during: .streaming, options: options) { session, prompt, generationOptions in
                 let last = try await consumeStreamingResponse(
                     session.streamResponse(to: prompt, options: generationOptions, reasoningLevel: options?.reasoningLevel)
                 ) { onStream($0.content) }
                 return (last?.content ?? "", last?.tokenUsage)
             }
         }
-        return generate(during: .streaming, options: options) { session, generationOptions in
+        return generate(prompt, during: .streaming, options: options) { session, prompt, generationOptions in
             let generationSchema = try GenerationSchemaBuilder.responseSchema(from: document)
             let last = try await consumeStreamingResponse(
                 session.streamResponse(
@@ -116,18 +116,20 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
 
     @available(iOS 26.0, *)
     private func generate(
+        _ prompt: NativePrompt,
         during operation: GenerationOperation,
         options: NativeGenerationOptions?,
-        _ request: @escaping (LanguageModelSession, GenerationOptions) async throws -> (String, NativeTokenUsage?)
+        _ request: @escaping (LanguageModelSession, Prompt, GenerationOptions) async throws -> (String, NativeTokenUsage?)
     ) -> Promise<String> {
         return Promise.async {
             let generationOptions = try GenerationOptions(options)
             try self.ensureModelIsAvailable()
+            let modelPrompt = try self.model.prompt(from: prompt)
             let modelSession = try self.beginResponse()
             defer { self.endResponse() }
 
             do {
-                let (content, usage) = try await request(modelSession, generationOptions)
+                let (content, usage) = try await request(modelSession, modelPrompt, generationOptions)
                 self.state.withLock { $0.usage.finishRequest(using: usage) }
                 return content
             } catch {
@@ -136,8 +138,8 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
         }
     }
 
-    private static func isBlank(_ prompt: String) -> Bool {
-        prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    private static func isEmpty(_ prompt: NativePrompt) -> Bool {
+        prompt.images.isEmpty && prompt.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     @available(iOS 26.0, *)
@@ -171,11 +173,12 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
      * Note: `SystemLanguageModel.tokenCount(for:)` is only available starting iOS 26.4.
      */
     @available(iOS 26.0, *)
-    func tokenCount(prompt: String) throws -> Promise<Double> {
+    func tokenCount(prompt: NativePrompt) throws -> Promise<Double> {
         return Promise.async {
             if #available(iOS 26.4, *) {
+                let modelPrompt = try self.model.prompt(from: prompt)
                 do {
-                    let count = try await self.model.tokenCount(for: prompt)
+                    let count = try await self.model.tokenCount(for: modelPrompt)
                     return Double(count)
                 } catch {
                     throw AppleAIError.tokenCountError(error)

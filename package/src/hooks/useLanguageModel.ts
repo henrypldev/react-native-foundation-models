@@ -5,7 +5,7 @@ import {
   LanguageModelSession,
   type LanguageModelSessionOptions,
 } from '../LanguageModelSession'
-import type { GenerationOptions } from '../types'
+import type { GenerationOptions, PromptInput } from '../types'
 
 export type UseLanguageModelConfig = LanguageModelSessionOptions & {
   onResponse?: (response: string) => void
@@ -17,7 +17,7 @@ export interface UseLanguageModelReturn {
   response: string
   loading: boolean
   error: AppleAIError | null
-  send: (prompt: string, options?: GenerationOptions) => Promise<string>
+  send: (prompt: PromptInput, options?: GenerationOptions) => Promise<string>
   reset: () => void
   isSessionReady: boolean
 }
@@ -124,7 +124,7 @@ export function useLanguageModel(
   }, [])
 
   const send = useCallback(
-    async (prompt: string, options?: GenerationOptions): Promise<string> => {
+    async (prompt: PromptInput, options?: GenerationOptions): Promise<string> => {
       if (!session?.session) {
         const error = sessionError || new SessionNotInitializedError()
         setError(error)

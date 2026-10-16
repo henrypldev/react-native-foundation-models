@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AppleAIError } from '../errors'
 import { isAppleAIError, parseNativeError } from '../errors'
 import type { LanguageModelSession } from '../LanguageModelSession'
-import type { GenerationOptions } from '../types'
+import type { GenerationOptions, PromptInput } from '../types'
 
 export interface StreamingOptions extends GenerationOptions {
   onToken?: (token: string) => void
@@ -15,7 +15,7 @@ export interface UseStreamingResponseReturn {
   isStreaming: boolean
   isComplete: boolean
   error: AppleAIError | null
-  streamResponse: (prompt: string, options?: StreamingOptions) => Promise<string>
+  streamResponse: (prompt: PromptInput, options?: StreamingOptions) => Promise<string>
   cancel: () => void
   reset: () => void
 }
@@ -47,7 +47,7 @@ export function useStreamingResponse(
   }, [])
 
   const streamResponse = useCallback(
-    async (prompt: string, options?: StreamingOptions): Promise<string> => {
+    async (prompt: PromptInput, options?: StreamingOptions): Promise<string> => {
       const { onToken, onComplete, onError, ...generationOptions } = options ?? {}
 
       if (!session?.session) {

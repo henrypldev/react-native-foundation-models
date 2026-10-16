@@ -41,3 +41,13 @@ enum NativeModelCapability {
     case reasoning
     case toolcalling
 }
+
+struct NativePromptImage {
+    var url: String
+    var label: String?
+}
+
+struct NativePrompt {
+    var text: String
+    var images: [NativePromptImage]
+}

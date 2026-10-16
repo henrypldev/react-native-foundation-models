@@ -156,9 +156,9 @@ open class HybridLanguageModelSessionSpec_cxx {
 
   // Methods
   @inline(__always)
-  public final func respond(prompt: std.string, schema: bridge.std__optional_std__shared_ptr_AnyMap__, options: bridge.std__optional_NativeGenerationOptions_) -> bridge.Result_std__shared_ptr_Promise_std__string___ {
+  public final func respond(prompt: NativePrompt, schema: bridge.std__optional_std__shared_ptr_AnyMap__, options: bridge.std__optional_NativeGenerationOptions_) -> bridge.Result_std__shared_ptr_Promise_std__string___ {
     do {
-      let __result = try self.__implementation.respond(prompt: String(prompt), schema: { () -> AnyMap? in
+      let __result = try self.__implementation.respond(prompt: prompt, schema: { () -> AnyMap? in
         if bridge.has_value_std__optional_std__shared_ptr_AnyMap__(schema) {
           let __unwrapped = bridge.get_std__optional_std__shared_ptr_AnyMap__(schema)
           return AnyMap(withCppPart: __unwrapped)
@@ -182,9 +182,9 @@ open class HybridLanguageModelSessionSpec_cxx {
   }
   
   @inline(__always)
-  public final func streamResponse(prompt: std.string, onStream: bridge.Func_void_std__string, schema: bridge.std__optional_std__shared_ptr_AnyMap__, options: bridge.std__optional_NativeGenerationOptions_) -> bridge.Result_std__shared_ptr_Promise_std__string___ {
+  public final func streamResponse(prompt: NativePrompt, onStream: bridge.Func_void_std__string, schema: bridge.std__optional_std__shared_ptr_AnyMap__, options: bridge.std__optional_NativeGenerationOptions_) -> bridge.Result_std__shared_ptr_Promise_std__string___ {
     do {
-      let __result = try self.__implementation.streamResponse(prompt: String(prompt), onStream: { () -> (String) -> Void in
+      let __result = try self.__implementation.streamResponse(prompt: prompt, onStream: { () -> (String) -> Void in
         let __wrappedFunction = bridge.wrap_Func_void_std__string(onStream)
         return { (__stream: String) -> Void in
           __wrappedFunction.call(std.string(__stream))
@@ -213,9 +213,9 @@ open class HybridLanguageModelSessionSpec_cxx {
   }
   
   @inline(__always)
-  public final func tokenCount(prompt: std.string) -> bridge.Result_std__shared_ptr_Promise_double___ {
+  public final func tokenCount(prompt: NativePrompt) -> bridge.Result_std__shared_ptr_Promise_double___ {
     do {
-      let __result = try self.__implementation.tokenCount(prompt: String(prompt))
+      let __result = try self.__implementation.tokenCount(prompt: prompt)
       let __resultCpp = { () -> bridge.std__shared_ptr_Promise_double__ in
         let __promise = bridge.create_std__shared_ptr_Promise_double__()
         let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_double__(__promise)

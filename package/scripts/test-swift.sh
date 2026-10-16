@@ -18,7 +18,7 @@ run_suite() {
   local binary="/tmp/rn-foundation-models-$1"
   shift
   swiftc -parse-as-library -module-cache-path "$CACHE" \
-    ios/AppleAIErrors.swift ios/GenerationFailure.swift ios/FoundationModels27.swift ios/TokenUsage.swift \
+    ios/AppleAIErrors.swift ios/GenerationFailure.swift ios/FoundationModels27.swift ios/TokenUsage.swift ios/PromptImageFile.swift \
     "$STAND_INS" "$@" -o "$binary"
   "$binary"
 }
@@ -35,6 +35,8 @@ check_compiler_fork() {
 check_compiler_fork
 check_stand_in NativeGenerationOptions
 check_stand_in NativeTokenUsage
+check_stand_in NativePromptImage
+check_stand_in NativePrompt
 
 run_suite streaming ios/StreamingResponseAccumulator.swift tests/StreamingResponseAccumulatorTests.swift
 run_suite schema ios/GenerationSchemaBuilder.swift ios/ToolContent.swift tests/GenerationSchemaBuilderTests.swift
@@ -43,3 +45,4 @@ run_suite generation-options ios/GenerationOptionsMapping.swift tests/Generation
 run_suite transcript ios/TranscriptCoding.swift tests/TranscriptCodingTests.swift
 run_suite session-instructions ios/SessionInstructions.swift tests/SessionInstructionsTests.swift
 run_suite token-usage tests/TokenUsageTests.swift
+run_suite prompt-image-file tests/PromptImageFileTests.swift

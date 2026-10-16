@@ -155,3 +155,26 @@ declare const serializedTranscriptBrand: unique symbol
 export type SerializedTranscript = string & {
   readonly [serializedTranscriptBrand]: 'SerializedTranscript'
 }
+
+/**
+ * An image to send with a prompt. iOS 27 and later only, on a model with the
+ * `vision` capability.
+ *
+ * `uri` must be a `file://` URI to an image on the device. Remote URLs and
+ * photo library (`ph://`) URIs are not supported, so download or export the
+ * image to a file first. `label` names the image so the prompt text can refer
+ * to it.
+ *
+ * Larger images cost more tokens. `tokenCount`, `usage`, and
+ * `lastResponseUsage` include the image tokens.
+ */
+export interface PromptImage {
+  uri: string
+  label?: string
+}
+
+/**
+ * A prompt for `respond`, `streamResponse`, and `tokenCount`: either text, or
+ * text with images. See `PromptImage` for the image requirements.
+ */
+export type PromptInput = string | { text: string; images?: PromptImage[] }
