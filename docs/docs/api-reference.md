@@ -216,6 +216,7 @@ class AppleAIError extends Error {
 - `SESSION_STREAMING_ERROR` - Streaming failed
 - `SESSION_RESPONSE_ERROR` - Response failed for a reason with no specific code
 - `SESSION_BUSY` - Another request is in progress on this session
+- `TRANSCRIPT_MUTATION_WHILE_RESPONDING` - The session transcript changed while the model was responding (iOS 27+)
 - `MODEL_UNAVAILABLE` - Apple Intelligence is not available on this device
 - `UNSUPPORTED_PLATFORM` - Platform not supported
 - `CONTEXT_EXCEEDED` - The conversation exceeded the context window. The session was recreated with a summary; retry the request

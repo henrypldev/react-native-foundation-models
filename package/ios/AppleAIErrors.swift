@@ -106,6 +106,7 @@ public enum GenerationFailureCode: String {
     case unsupportedTranscriptContent = "UNSUPPORTED_TRANSCRIPT_CONTENT"
     case decodingFailure = "DECODING_FAILURE"
     case rateLimited = "RATE_LIMITED"
+    case transcriptMutationWhileResponding = "TRANSCRIPT_MUTATION_WHILE_RESPONDING"
     case refusal = "REFUSAL"
     case timeout = "TIMEOUT"
     case generic = "GENERATION_ERROR"

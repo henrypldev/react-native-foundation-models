@@ -16,6 +16,7 @@ extension GenerationFailureCode {
         case .unsupportedTranscriptContent: "The session transcript has content the model does not support"
         case .decodingFailure: "The model response could not be decoded"
         case .rateLimited: "The model rate-limited the request"
+        case .transcriptMutationWhileResponding: "The session transcript changed while the model was responding"
         case .refusal: "The model refused the request"
         case .timeout: "The request timed out"
         case .generic: "Model generation failed"
@@ -35,6 +36,18 @@ extension AppleAIError {
             self = Self.mapping(error, during: operation)
         default:
             self = Self.mappingTypedError(error, during: operation) ?? Self.unmapped(error, during: operation)
+        }
+    }
+
+    static func requiresContextRecovery(after error: any Error) -> Bool {
+        switch error {
+        case is AppleAIError, is LanguageModelSession.ToolCallError:
+            false
+        default:
+            switch AppleAIError(generationFailure: error, during: .response) {
+            case .contextExceeded: true
+            default: false
+            }
         }
     }
 
@@ -111,7 +124,9 @@ extension AppleAIError {
     @available(iOS 27.0, macOS 27.0, *)
     private static func mapping(_ error: LanguageModelSession.Error, during op: GenerationOperation) -> AppleAIError {
         switch error {
-        case .concurrentRequests, .transcriptMutationWhileResponding: .sessionBusy
+        case .concurrentRequests: .sessionBusy
+        case .transcriptMutationWhileResponding:
+            failed(.transcriptMutationWhileResponding, error.debugDescription, during: op)
         @unknown default: failed(.generic, error.debugDescription, during: op)
         }
     }

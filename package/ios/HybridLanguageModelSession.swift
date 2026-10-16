@@ -172,7 +172,7 @@ class HybridLanguageModelSession: HybridLanguageModelSessionSpec {
         in previousSession: LanguageModelSession
     ) async throws -> AppleAIError {
         let failure = AppleAIError(generationFailure: error, during: operation)
-        if case .contextExceeded = failure {
+        if AppleAIError.requiresContextRecovery(after: error) {
             try await recoverFromContextOverflow(previousSession: previousSession)
         }
         return failure
