@@ -28,15 +28,15 @@ constructor(config?: LanguageModelSessionOptions)
 Generates a complete response from the language model.
 
 ```typescript
-respond(prompt: string, options?: GenerationOptions): Promise<string>
+respond(prompt: PromptInput, options?: GenerationOptions): Promise<string>
 respond<S extends ObjectSchema>(
-  prompt: string,
+  prompt: PromptInput,
   options: StructuredGenerationOptions<S>,
 ): Promise<z.infer<S>>
 ```
 
 **Parameters**:
-- `prompt: string` - The user's message
+- `prompt: PromptInput` - The user's message, as text or as text with images. See [Image input](#image-input)
 - `options?: GenerationOptions` - Sampling, temperature, and length limits for this request. See [`GenerationOptions`](#generationoptions)
 - `options.schema?: ObjectSchema` - A Zod object schema. When set, the response is constrained to the schema and the promise resolves with the parsed value. See [Structured output](#structured-output)
 
@@ -53,19 +53,19 @@ Initiates a streaming response from the language model.
 
 ```typescript
 streamResponse(
-  prompt: string,
+  prompt: PromptInput,
   onChunk: (responseSoFar: string) => void,
   options?: GenerationOptions,
 ): Promise<string>
 streamResponse<S extends ObjectSchema>(
-  prompt: string,
+  prompt: PromptInput,
   onChunk: (partial: DeepPartial<z.input<S>>) => void,
   options: StructuredGenerationOptions<S>,
 ): Promise<z.infer<S>>
 ```
 
 **Parameters**:
-- `prompt: string` - The user's message
+- `prompt: PromptInput` - The user's message, as text or as text with images. See [Image input](#image-input)
 - `onChunk` - Called with the full streamed response so far. With `options.schema`, called with the partial object generated so far
 - `options?: GenerationOptions` - Sampling, temperature, and length limits for this request. See [`GenerationOptions`](#generationoptions)
 - `options.schema?: ObjectSchema` - A Zod object schema. See [Structured output](#structured-output)
@@ -91,16 +91,42 @@ const final = await session.streamResponse(text, setDraft, { schema: Contact });
 - Context overflow and the other generation errors have the same codes as for text responses.
 - `useLanguageModel` and `useStreamingResponse` return text only.
 
-#### `tokenCount(prompt)`
+#### Image input
 
-Returns the number of tokens the provided text consumes for this session's model.
+On iOS 27 and later, a prompt can carry images. Pass an object with `text` and `images` instead of a string. It works with `respond`, `streamResponse`, `tokenCount`, structured output, and the hooks.
 
 ```typescript
-tokenCount(prompt: string): Promise<number>
+const Receipt = z.object({ merchant: z.string(), total: z.number() });
+
+const { capabilities } = checkFoundationModelsAvailability();
+if (capabilities?.includes('vision')) {
+  const receipt = await session.respond(
+    {
+      text: 'What is on this receipt?',
+      images: [{ uri: 'file:///path/to/receipt.jpg', label: 'receipt' }],
+    },
+    { schema: Receipt },
+  );
+}
+```
+
+- Each `uri` must be a `file://` URI to an image on the device. Remote URLs and photo library (`ph://`) URIs are not supported, so download or export the image to a file first. Any other URI rejects with `INVALID_PROMPT` before the request reaches the model, and so does a file that does not exist. The error message names the image, for example `images[0].uri`.
+- `label` is optional. It names the image so the text can refer to it.
+- The model needs the `vision` capability. A model without it rejects the request with `UNSUPPORTED_CAPABILITY`. On iOS 26, a prompt with images rejects with `UNSUPPORTED_PLATFORM`.
+- Larger images cost more tokens. `tokenCount`, `usage`, and `lastResponseUsage` include the image tokens.
+- `session.transcript` stores each image inside the transcript, so a saved transcript grows by more than the image file's size.
+- Tools cannot receive the images yet.
+
+#### `tokenCount(prompt)`
+
+Returns the number of tokens the provided prompt consumes for this session's model. On iOS 27 and later the count includes the prompt's images.
+
+```typescript
+tokenCount(prompt: PromptInput): Promise<number>
 ```
 
 **Parameters**:
-- `prompt: string` - The text to measure
+- `prompt: PromptInput` - The prompt to measure. See [Image input](#image-input)
 
 **Availability**: iOS 26.4 or later. On earlier versions the returned promise rejects with an `UNSUPPORTED_PLATFORM` error.
 
@@ -236,7 +262,7 @@ function useLanguageModel(config?: UseLanguageModelConfig): UseLanguageModelRetu
 - `response: string` - Latest response from the AI
 - `loading: boolean` - Whether a request is in progress
 - `error: AppleAIError | null` - Last error that occurred
-- `send: (prompt: string, options?: GenerationOptions) => Promise<string>` - Function to send messages, with optional per-request generation options
+- `send: (prompt: PromptInput, options?: GenerationOptions) => Promise<string>` - Function to send messages, with optional per-request generation options
 - `reset: () => void` - Reset response and error state
 - `isSessionReady: boolean` - Whether session is initialized and ready
 
@@ -256,7 +282,7 @@ function useStreamingResponse(session: LanguageModelSession): UseStreamingRespon
 - `isStreaming: boolean` - Whether currently streaming
 - `isComplete: boolean` - Whether streaming is complete
 - `error: AppleAIError | null` - Last error that occurred
-- `streamResponse: (prompt: string, options?: StreamingOptions) => Promise<string>` - Start streaming
+- `streamResponse: (prompt: PromptInput, options?: StreamingOptions) => Promise<string>` - Start streaming
 - `cancel: () => void` - Cancel current stream
 - `reset: () => void` - Reset state
 
@@ -278,6 +304,19 @@ interface FoundationModelsAvailability {
 
 type ModelCapability = 'vision' | 'guidedGeneration' | 'reasoning' | 'toolCalling';
 ```
+
+### `PromptInput`
+
+```typescript
+type PromptInput = string | { text: string; images?: PromptImage[] };
+
+interface PromptImage {
+  uri: string;
+  label?: string;
+}
+```
+
+See [Image input](#image-input).
 
 ### `TokenUsage`
 
@@ -423,6 +462,7 @@ class AppleAIError extends Error {
 | `GENERATION_ERROR` | The model failed with an error this library does not know yet, for example one added in a new OS version |
 | `GUARDRAIL_VIOLATION` | The prompt or response violated the model guardrails |
 | `INVALID_GENERATION_OPTIONS` | A `GenerationOptions` value is invalid. `details.field` names the field |
+| `INVALID_PROMPT` | A prompt image is not a `file://` URI or its file does not exist. The message names the image |
 | `INVALID_SESSION_OPTIONS` | The session options combine `instructions` and `transcript` |
 | `INVALID_TRANSCRIPT` | The `transcript` option cannot be decoded. It is not valid JSON, not a transcript, or holds a version or content this OS does not know |
 | `MODEL_UNAVAILABLE` | Apple Intelligence is not available on this device |
@@ -446,7 +486,7 @@ class AppleAIError extends Error {
 | `TRANSCRIPT_MUTATION_WHILE_RESPONDING` | The session transcript changed while the model was responding (iOS 27+) |
 | `UNKNOWN_ERROR` | A failure with no code and no operation to attribute it to |
 | `UNKNOWN_TOOL_ERROR` | The model called a tool the session does not have |
-| `UNSUPPORTED_CAPABILITY` | The model does not support a capability the request needs, such as `reasoningLevel` (iOS 27+) |
+| `UNSUPPORTED_CAPABILITY` | The model does not support a capability the request needs, such as `reasoningLevel` or image input (iOS 27+) |
 | `UNSUPPORTED_GUIDE` | The request used an unsupported generation guide |
 | `UNSUPPORTED_LANGUAGE_OR_LOCALE` | The request used an unsupported language or locale |
 | `UNSUPPORTED_PLATFORM` | The OS version does not support the call |

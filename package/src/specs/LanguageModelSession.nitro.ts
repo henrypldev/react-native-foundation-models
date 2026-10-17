@@ -46,19 +46,29 @@ export interface NativeGenerationOptions {
   reasoningLevel?: NativeReasoningLevel
 }
 
+export interface NativePromptImage {
+  url: string
+  label?: string
+}
+
+export interface NativePrompt {
+  text: string
+  images: Array<NativePromptImage>
+}
+
 export interface LanguageModelSession extends HybridObject<{ ios: 'swift' }> {
   respond(
-    prompt: string,
+    prompt: NativePrompt,
     schema?: AnyMap,
     options?: NativeGenerationOptions,
   ): Promise<string>
   streamResponse(
-    prompt: string,
+    prompt: NativePrompt,
     onStream: (stream: string) => void,
     schema?: AnyMap,
     options?: NativeGenerationOptions,
   ): Promise<string>
-  tokenCount(prompt: string): Promise<number>
+  tokenCount(prompt: NativePrompt): Promise<number>
   serializeTranscript(): string
   prewarm(promptPrefix?: string): void
   readonly wasContextReset: boolean

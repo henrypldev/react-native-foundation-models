@@ -9,6 +9,13 @@ extension LanguageModelSession.Response: UsageReporting {}
 @available(iOS 26.0, macOS 26.0, *)
 extension LanguageModelSession.ResponseStream.Snapshot: UsageReporting {}
 
+@available(iOS 26.0, macOS 26.0, *)
+extension SystemLanguageModel {
+    func prompt(from prompt: NativePrompt) throws -> Prompt {
+        prompt.images.isEmpty ? Prompt(prompt.text) : try imagePrompt(from: prompt)
+    }
+}
+
 #if compiler(>=6.4)
 
 protocol UsageReporting {
@@ -52,7 +59,7 @@ private extension ContextOptions {
 @available(iOS 26.0, macOS 26.0, *)
 extension LanguageModelSession {
     func respond(
-        to prompt: String,
+        to prompt: Prompt,
         options: GenerationOptions,
         reasoningLevel: NativeReasoningLevel?
     ) async throws -> Response<String> {
@@ -63,7 +70,7 @@ extension LanguageModelSession {
     }
 
     func respond(
-        to prompt: String,
+        to prompt: Prompt,
         schema: GenerationSchema,
         options: GenerationOptions,
         reasoningLevel: NativeReasoningLevel?
@@ -80,7 +87,7 @@ extension LanguageModelSession {
     }
 
     func streamResponse(
-        to prompt: String,
+        to prompt: Prompt,
         options: GenerationOptions,
         reasoningLevel: NativeReasoningLevel?
     ) -> ResponseStream<String> {
@@ -91,7 +98,7 @@ extension LanguageModelSession {
     }
 
     func streamResponse(
-        to prompt: String,
+        to prompt: Prompt,
         schema: GenerationSchema,
         options: GenerationOptions,
         reasoningLevel: NativeReasoningLevel?
@@ -136,6 +143,27 @@ extension GenerationOptions {
 
 @available(iOS 26.0, macOS 26.0, *)
 extension SystemLanguageModel {
+    fileprivate func imagePrompt(from prompt: NativePrompt) throws -> Prompt {
+        guard #available(iOS 27.0, macOS 27.0, *) else {
+            throw AppleAIError.unsupportedPlatform("Image input requires iOS 27 or later")
+        }
+        let urls = try prompt.images.enumerated().map { try PromptImageFile.url($1.url, at: $0) }
+        guard capabilities.contains(.vision) else {
+            throw AppleAIError.generationError(
+                .unsupportedCapability,
+                message: "The on-device model does not support image input"
+            )
+        }
+        let attachments = zip(urls, prompt.images).map { url, image in
+            let attachment = Attachment<ImageAttachmentContent>(imageURL: url)
+            return image.label.map(attachment.label) ?? attachment
+        }
+        return Prompt {
+            prompt.text
+            attachments
+        }
+    }
+
     var variantDisplayName: String? {
         guard #available(iOS 27.0, macOS 27.0, *) else { return nil }
         return variant.displayName
@@ -217,7 +245,7 @@ extension UsageReporting {
 @available(iOS 26.0, macOS 26.0, *)
 extension LanguageModelSession {
     func respond(
-        to prompt: String,
+        to prompt: Prompt,
         options: GenerationOptions,
         reasoningLevel: NativeReasoningLevel?
     ) async throws -> Response<String> {
@@ -225,7 +253,7 @@ extension LanguageModelSession {
     }
 
     func respond(
-        to prompt: String,
+        to prompt: Prompt,
         schema: GenerationSchema,
         options: GenerationOptions,
         reasoningLevel: NativeReasoningLevel?
@@ -234,7 +262,7 @@ extension LanguageModelSession {
     }
 
     func streamResponse(
-        to prompt: String,
+        to prompt: Prompt,
         options: GenerationOptions,
         reasoningLevel: NativeReasoningLevel?
     ) -> ResponseStream<String> {
@@ -242,7 +270,7 @@ extension LanguageModelSession {
     }
 
     func streamResponse(
-        to prompt: String,
+        to prompt: Prompt,
         schema: GenerationSchema,
         options: GenerationOptions,
         reasoningLevel: NativeReasoningLevel?
@@ -265,6 +293,10 @@ extension GenerationOptions {
 
 @available(iOS 26.0, macOS 26.0, *)
 extension SystemLanguageModel {
+    fileprivate func imagePrompt(from prompt: NativePrompt) throws -> Prompt {
+        throw AppleAIError.unsupportedPlatform("Image input requires iOS 27 or later")
+    }
+
     var variantDisplayName: String? { nil }
     var nativeCapabilities: [NativeModelCapability]? { nil }
 }

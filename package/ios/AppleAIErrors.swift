@@ -19,6 +19,7 @@ public enum AppleAIError: Error, LocalizedError, CustomStringConvertible {
     case invalidGenerationOptions(String)
     case invalidTranscript(String)
     case transcriptEncodingError(Error)
+    case invalidPrompt(String)
     
     public var errorDescription: String? {
         switch self {
@@ -58,6 +59,8 @@ public enum AppleAIError: Error, LocalizedError, CustomStringConvertible {
             return "Invalid transcript: \(details)"
         case .transcriptEncodingError(let error):
             return "Failed to encode transcript: \(error.localizedDescription)"
+        case .invalidPrompt(let details):
+            return "Invalid prompt: \(details)"
         }
     }
     
@@ -103,6 +106,8 @@ public enum AppleAIError: Error, LocalizedError, CustomStringConvertible {
             return "INVALID_TRANSCRIPT"
         case .transcriptEncodingError:
             return "TRANSCRIPT_ENCODING_ERROR"
+        case .invalidPrompt:
+            return "INVALID_PROMPT"
         }
     }
 }

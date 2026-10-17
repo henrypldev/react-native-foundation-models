@@ -16,6 +16,8 @@ namespace margelo::nitro::rnfoundationmodels { class HybridLanguageModelSessionS
 namespace margelo::nitro::rnfoundationmodels { struct NativeGenerationOptions; }
 // Forward declaration of `NativeModelCapability` to properly resolve imports.
 namespace margelo::nitro::rnfoundationmodels { enum class NativeModelCapability; }
+// Forward declaration of `NativePromptImage` to properly resolve imports.
+namespace margelo::nitro::rnfoundationmodels { struct NativePromptImage; }
 // Forward declaration of `NativeReasoningLevel` to properly resolve imports.
 namespace margelo::nitro::rnfoundationmodels { enum class NativeReasoningLevel; }
 // Forward declaration of `NativeSamplingMode` to properly resolve imports.
@@ -38,6 +40,7 @@ namespace RNFoundationModels { class HybridLanguageModelSessionSpec_cxx; }
 #include "HybridLanguageModelSessionSpec.hpp"
 #include "NativeGenerationOptions.hpp"
 #include "NativeModelCapability.hpp"
+#include "NativePromptImage.hpp"
 #include "NativeReasoningLevel.hpp"
 #include "NativeSamplingMode.hpp"
 #include "NativeTokenUsage.hpp"
@@ -114,6 +117,32 @@ namespace margelo::nitro::rnfoundationmodels::bridge::swift {
   Func_void_std__exception_ptr create_Func_void_std__exception_ptr(void* NON_NULL swiftClosureWrapper) noexcept;
   inline Func_void_std__exception_ptr_Wrapper wrap_Func_void_std__exception_ptr(Func_void_std__exception_ptr value) noexcept {
     return Func_void_std__exception_ptr_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::optional<std::string>
+  /**
+   * Specialized version of `std::optional<std::string>`.
+   */
+  using std__optional_std__string_ = std::optional<std::string>;
+  inline std::optional<std::string> create_std__optional_std__string_(const std::string& value) noexcept {
+    return std::optional<std::string>(value);
+  }
+  inline bool has_value_std__optional_std__string_(const std::optional<std::string>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline std::string get_std__optional_std__string_(const std::optional<std::string>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::vector<NativePromptImage>
+  /**
+   * Specialized version of `std::vector<NativePromptImage>`.
+   */
+  using std__vector_NativePromptImage_ = std::vector<NativePromptImage>;
+  inline std::vector<NativePromptImage> create_std__vector_NativePromptImage_(size_t size) noexcept {
+    std::vector<NativePromptImage> vector;
+    vector.reserve(size);
+    return vector;
   }
   
   // pragma MARK: std::optional<std::shared_ptr<AnyMap>>
@@ -238,21 +267,6 @@ namespace margelo::nitro::rnfoundationmodels::bridge::swift {
   Func_void_double create_Func_void_double(void* NON_NULL swiftClosureWrapper) noexcept;
   inline Func_void_double_Wrapper wrap_Func_void_double(Func_void_double value) noexcept {
     return Func_void_double_Wrapper(std::move(value));
-  }
-  
-  // pragma MARK: std::optional<std::string>
-  /**
-   * Specialized version of `std::optional<std::string>`.
-   */
-  using std__optional_std__string_ = std::optional<std::string>;
-  inline std::optional<std::string> create_std__optional_std__string_(const std::string& value) noexcept {
-    return std::optional<std::string>(value);
-  }
-  inline bool has_value_std__optional_std__string_(const std::optional<std::string>& optional) noexcept {
-    return optional.has_value();
-  }
-  inline std::string get_std__optional_std__string_(const std::optional<std::string>& optional) noexcept {
-    return optional.value();
   }
   
   // pragma MARK: std::optional<NativeTokenUsage>

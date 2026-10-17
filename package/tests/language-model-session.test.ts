@@ -154,12 +154,12 @@ describe('LanguageModelSession native boundary', () => {
     })
 
     expect(respond).toHaveBeenCalledWith(
-      'Hello',
+      { text: 'Hello', images: [] },
       undefined,
       expect.objectContaining({ maximumResponseTokens: 5, samplingMode: 'greedy' }),
     )
     expect(streamResponse).toHaveBeenCalledWith(
-      'Hello',
+      { text: 'Hello', images: [] },
       expect.any(Function),
       undefined,
       expect.objectContaining({
@@ -225,7 +225,7 @@ describe('LanguageModelSession structured output', () => {
       servings: 2,
     })
     expect(respond).toHaveBeenCalledWith(
-      'A pasta recipe',
+      { text: 'A pasta recipe', images: [] },
       {
         type: 'object',
         properties: {
@@ -373,6 +373,112 @@ describe('LanguageModelSession structured output', () => {
       session.streamResponse('A pasta recipe', onChunk, { schema: Recipe }),
     ).rejects.toMatchObject({ code: 'RESPONSE_VALIDATION_ERROR' })
     expect(onChunk).not.toHaveBeenCalled()
+  })
+})
+
+const receipt = { uri: 'file:///tmp/receipt.jpg', label: 'receipt' }
+
+describe('LanguageModelSession image prompts', () => {
+  test('sends the text and images of an object prompt to every native call', async () => {
+    const respond = mock(async () => 'A coffee receipt')
+    const streamResponse = mock(async () => 'A coffee receipt')
+    const tokenCount = mock(async () => 812)
+    nativeSession.respond = respond
+    nativeSession.streamResponse = streamResponse
+    nativeSession.tokenCount = tokenCount
+    const prompt = {
+      text: 'What is on these?',
+      images: [receipt, { uri: 'file:///tmp/menu.png' }],
+    }
+    const nativePrompt = {
+      text: 'What is on these?',
+      images: [
+        { url: 'file:///tmp/receipt.jpg', label: 'receipt' },
+        { url: 'file:///tmp/menu.png', label: undefined },
+      ],
+    }
+
+    const session = new LanguageModelSession()
+    await session.respond(prompt)
+    await session.streamResponse(prompt, () => {})
+    const tokens = await session.tokenCount(prompt)
+
+    expect(respond).toHaveBeenCalledWith(nativePrompt, undefined, undefined)
+    expect(streamResponse).toHaveBeenCalledWith(
+      nativePrompt,
+      expect.any(Function),
+      undefined,
+      undefined,
+    )
+    expect(tokenCount).toHaveBeenCalledWith(nativePrompt)
+    expect(tokens).toBe(812)
+  })
+
+  test('sends an object prompt without images as text only', async () => {
+    const respond = mock(async () => 'response')
+    nativeSession.respond = respond
+
+    const session = new LanguageModelSession()
+    await session.respond({ text: 'Hello' })
+
+    expect(respond).toHaveBeenCalledWith(
+      { text: 'Hello', images: [] },
+      undefined,
+      undefined,
+    )
+  })
+
+  test.each([
+    ['a remote URL', 'https://example.com/receipt.jpg'],
+    ['a photo library URI', 'ph://ABC-123'],
+    ['a bare path', '/tmp/receipt.jpg'],
+  ])('rejects %s with INVALID_PROMPT before calling native', async (_label, uri) => {
+    const respond = mock(async () => 'response')
+    const streamResponse = mock(async () => 'complete')
+    const tokenCount = mock(async () => 1)
+    nativeSession.respond = respond
+    nativeSession.streamResponse = streamResponse
+    nativeSession.tokenCount = tokenCount
+    const prompt = { text: 'Describe these', images: [receipt, { uri }] }
+    const invalid = {
+      name: 'AppleAIError',
+      code: 'INVALID_PROMPT',
+      details: { field: 'images[1].uri', value: uri },
+    }
+
+    const session = new LanguageModelSession()
+
+    await expect(session.respond(prompt)).rejects.toMatchObject(invalid)
+    await expect(session.streamResponse(prompt, () => {})).rejects.toMatchObject(invalid)
+    await expect(session.tokenCount(prompt)).rejects.toMatchObject(invalid)
+    expect(respond).not.toHaveBeenCalled()
+    expect(streamResponse).not.toHaveBeenCalled()
+    expect(tokenCount).not.toHaveBeenCalled()
+  })
+
+  test('parses structured output from a prompt with images', async () => {
+    const respond = mock(async () => recipeJson)
+    nativeSession.respond = respond
+    nativeSession.streamResponse = async (_prompt, onChunk) => {
+      onChunk(recipeJson)
+      return recipeJson
+    }
+
+    const session = new LanguageModelSession()
+    const prompt = { text: 'Read this recipe card', images: [receipt] }
+    const recipe = await session.respond(prompt, { schema: Recipe })
+    const streamed = await session.streamResponse(prompt, () => {}, { schema: Recipe })
+
+    expect(recipe.servings).toBe(2)
+    expect(streamed).toEqual(recipe)
+    expect(respond).toHaveBeenCalledWith(
+      {
+        text: 'Read this recipe card',
+        images: [{ url: receipt.uri, label: receipt.label }],
+      },
+      expect.objectContaining({ type: 'object' }),
+      expect.anything(),
+    )
   })
 })
 

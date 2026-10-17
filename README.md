@@ -1,12 +1,12 @@
 # react-native-foundation-models
 
-React Native access to Apple's on-device Foundation Models (Apple Intelligence) on iOS 26 and later. It supports streaming, tool calling, structured output from Zod schemas, per-request generation options, transcripts, and token usage.
+React Native access to Apple's on-device Foundation Models (Apple Intelligence) on iOS 26 and later. It supports streaming, tool calling, structured output from Zod schemas, image input, per-request generation options, transcripts, and token usage.
 
 The full API, every option, and every error code are in the [API reference](https://github.com/henrypldev/react-native-foundation-models/blob/main/docs/docs/api-reference.md).
 
 ## Requirements
 
-- iOS 26.0 or later. Token usage, `toolCallingMode`, `reasoningLevel`, and model info need iOS 27.
+- iOS 26.0 or later. Token usage, `toolCallingMode`, `reasoningLevel`, image input, and model info need iOS 27.
 - Apple Intelligence enabled in Settings > Apple Intelligence & Siri, on a device that supports it.
 - `react-native-nitro-modules`.
 
@@ -49,6 +49,20 @@ const Recipe = z.object({ title: z.string(), ingredients: z.array(z.string()) })
 
 const recipe = await session.respond('A quick pasta recipe', { schema: Recipe });
 ```
+
+### Image input
+
+```typescript
+const receipt = await session.respond(
+  {
+    text: 'What is on this receipt?',
+    images: [{ uri: 'file:///path/to/receipt.jpg', label: 'receipt' }],
+  },
+  { schema: Receipt },
+);
+```
+
+Images need iOS 27 and a model with the `vision` capability. Only `file://` URIs are supported. Images cost tokens, and `tokenCount` and `usage` include them.
 
 ### Tools
 

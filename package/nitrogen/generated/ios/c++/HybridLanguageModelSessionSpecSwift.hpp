@@ -14,6 +14,10 @@ namespace RNFoundationModels { class HybridLanguageModelSessionSpec_cxx; }
 
 // Forward declaration of `NativeTokenUsage` to properly resolve imports.
 namespace margelo::nitro::rnfoundationmodels { struct NativeTokenUsage; }
+// Forward declaration of `NativePrompt` to properly resolve imports.
+namespace margelo::nitro::rnfoundationmodels { struct NativePrompt; }
+// Forward declaration of `NativePromptImage` to properly resolve imports.
+namespace margelo::nitro::rnfoundationmodels { struct NativePromptImage; }
 // Forward declaration of `NativeGenerationOptions` to properly resolve imports.
 namespace margelo::nitro::rnfoundationmodels { struct NativeGenerationOptions; }
 // Forward declaration of `NativeSamplingMode` to properly resolve imports.
@@ -27,6 +31,9 @@ namespace margelo::nitro::rnfoundationmodels { enum class NativeReasoningLevel; 
 #include <optional>
 #include <string>
 #include <NitroModules/Promise.hpp>
+#include "NativePrompt.hpp"
+#include "NativePromptImage.hpp"
+#include <vector>
 #include <NitroModules/AnyMap.hpp>
 #include "NativeGenerationOptions.hpp"
 #include "NativeSamplingMode.hpp"
@@ -94,24 +101,24 @@ namespace margelo::nitro::rnfoundationmodels {
 
   public:
     // Methods
-    inline std::shared_ptr<Promise<std::string>> respond(const std::string& prompt, const std::optional<std::shared_ptr<AnyMap>>& schema, const std::optional<NativeGenerationOptions>& options) override {
-      auto __result = _swiftPart.respond(prompt, schema, options);
+    inline std::shared_ptr<Promise<std::string>> respond(const NativePrompt& prompt, const std::optional<std::shared_ptr<AnyMap>>& schema, const std::optional<NativeGenerationOptions>& options) override {
+      auto __result = _swiftPart.respond(std::forward<decltype(prompt)>(prompt), schema, options);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
       auto __value = std::move(__result.value());
       return __value;
     }
-    inline std::shared_ptr<Promise<std::string>> streamResponse(const std::string& prompt, const std::function<void(const std::string& /* stream */)>& onStream, const std::optional<std::shared_ptr<AnyMap>>& schema, const std::optional<NativeGenerationOptions>& options) override {
-      auto __result = _swiftPart.streamResponse(prompt, onStream, schema, options);
+    inline std::shared_ptr<Promise<std::string>> streamResponse(const NativePrompt& prompt, const std::function<void(const std::string& /* stream */)>& onStream, const std::optional<std::shared_ptr<AnyMap>>& schema, const std::optional<NativeGenerationOptions>& options) override {
+      auto __result = _swiftPart.streamResponse(std::forward<decltype(prompt)>(prompt), onStream, schema, options);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }
       auto __value = std::move(__result.value());
       return __value;
     }
-    inline std::shared_ptr<Promise<double>> tokenCount(const std::string& prompt) override {
-      auto __result = _swiftPart.tokenCount(prompt);
+    inline std::shared_ptr<Promise<double>> tokenCount(const NativePrompt& prompt) override {
+      auto __result = _swiftPart.tokenCount(std::forward<decltype(prompt)>(prompt));
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

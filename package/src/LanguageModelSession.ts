@@ -4,6 +4,7 @@ import type { z } from 'zod'
 import { AppleAIError, parseNativeError } from './errors'
 import { toNativeGenerationOptions } from './generation-options'
 import { type ObjectSchema, toGenerationSchema } from './generation-schema'
+import { toNativePrompt } from './prompt'
 import type {
   LanguageModelSessionConfig,
   LanguageModelSessionFactory as LanguageModelSessionFactorySpec,
@@ -12,8 +13,8 @@ import type {
 } from './specs/LanguageModelSession.nitro'
 import {
   type DeepPartial,
-  parseResponseJson,
   parseResponse,
+  parseResponseJson,
   type StructuredGenerationOptions,
 } from './structured-output'
 import type {
@@ -21,6 +22,7 @@ import type {
   FoundationModelsAvailability,
   FoundationModelsModelFamily,
   GenerationOptions,
+  PromptInput,
   SerializedTranscript,
   SystemLanguageModelGuardrails,
   SystemLanguageModelUseCase,
@@ -257,6 +259,9 @@ export class LanguageModelSession {
    * Invalid `options` reject with an `INVALID_GENERATION_OPTIONS` error before
    * the request reaches the model.
    *
+   * The prompt can carry images on iOS 27 and later. See `PromptImage`. An
+   * image URI that is not `file://` rejects with `INVALID_PROMPT`.
+   *
    * @example
    * ```typescript
    * const answer = await session.respond('Name a color', {
@@ -267,21 +272,27 @@ export class LanguageModelSession {
    * const recipe = await session.respond('A quick pasta recipe', {
    *   schema: z.object({ title: z.string(), ingredients: z.array(z.string()) }),
    * })
+   *
+   * const caption = await session.respond({
+   *   text: 'Describe this photo',
+   *   images: [{ uri: 'file:///path/to/photo.jpg', label: 'photo' }],
+   * })
    * ```
    */
   respond<S extends ObjectSchema>(
-    prompt: string,
+    prompt: PromptInput,
     options: StructuredGenerationOptions<S>,
   ): Promise<z.infer<S>>
-  respond(prompt: string, options?: GenerationOptions): Promise<string>
+  respond(prompt: PromptInput, options?: GenerationOptions): Promise<string>
   async respond(
-    prompt: string,
+    prompt: PromptInput,
     options?: Partial<StructuredGenerationOptions<ObjectSchema>>,
   ): Promise<unknown> {
     try {
+      const nativePrompt = toNativePrompt(prompt)
       const request = responseRequest(options)
       return request.parse(
-        await this.session.respond(prompt, request.schema, request.options),
+        await this.session.respond(nativePrompt, request.schema, request.options),
       )
     } catch (error) {
       throw parseNativeError(error, {
@@ -312,21 +323,22 @@ export class LanguageModelSession {
    * ```
    */
   streamResponse<S extends ObjectSchema>(
-    prompt: string,
+    prompt: PromptInput,
     onChunk: (partial: DeepPartial<z.input<S>>) => void,
     options: StructuredGenerationOptions<S>,
   ): Promise<z.infer<S>>
   streamResponse(
-    prompt: string,
+    prompt: PromptInput,
     onChunk: (chunk: string) => void,
     options?: GenerationOptions,
   ): Promise<string>
   async streamResponse<Chunk>(
-    prompt: string,
+    prompt: PromptInput,
     onChunk: (chunk: Chunk) => void,
     options?: Partial<StructuredGenerationOptions<ObjectSchema>>,
   ): Promise<unknown> {
     try {
+      const nativePrompt = toNativePrompt(prompt)
       const request = responseRequest(options)
       let streamFailure: AppleAIError | undefined
 
@@ -363,7 +375,7 @@ export class LanguageModelSession {
       }
 
       const response = await this.session.streamResponse(
-        prompt,
+        nativePrompt,
         emit,
         request.schema,
         request.options,
@@ -384,13 +396,14 @@ export class LanguageModelSession {
 
   /**
    * Returns the number of tokens the provided prompt consumes for this session's model.
+   * On iOS 27 and later the count includes the prompt's images.
    *
    * Note: This API is only available on iOS 26.4 or later. On earlier versions
    * the returned promise will reject with an `UNSUPPORTED_PLATFORM` error.
    */
-  async tokenCount(prompt: string): Promise<number> {
+  async tokenCount(prompt: PromptInput): Promise<number> {
     try {
-      return await this.session.tokenCount(prompt)
+      return await this.session.tokenCount(toNativePrompt(prompt))
     } catch (error) {
       throw parseNativeError(error, {
         fallbackCode: 'TOKEN_COUNT_ERROR',
