@@ -52,7 +52,7 @@
     "@release-it/conventional-changelog": "^10.0.1",
     "@types/bun": "^1.4.2",
     "@types/react": "^19.1.10",
-    "nitrogen": "0.36.5",
+    "nitrogen": "0.37.2",
     "react": "19.2.3",
     "react-native": "0.86.2",
     "react-native-builder-bob": "^0.40.13",
